@@ -12,7 +12,7 @@ class CommentsPage extends StatelessWidget {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      resizeToAvoidBottomInset: true, // ✅ IMPORTANT
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: const Text('Comments')),
       body: Column(
         children: [
@@ -51,38 +51,56 @@ class CommentsPage extends StatelessWidget {
                     final bool isOwner = currentUser != null &&
                         c['uid'] == currentUser.uid;
 
-                    return GestureDetector(
-                      onLongPress: isOwner
-                          ? () {
-                              _showDeleteCommentDialog(
-                                context,
-                                ref,
-                                commentId,
-                              );
-                            }
-                          : null,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: RichText(
-                          text: TextSpan(
-                            style:
-                                const TextStyle(color: Colors.black),
-                            children: [
-                              TextSpan(
-                                text: '${c['username']} ',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// COMMENT TEXT
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style:
+                                    const TextStyle(color: Colors.black),
+                                children: [
+                                  TextSpan(
+                                    text: '${c['username']} ',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  TextSpan(text: c['text']),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          /// DELETE OPTION (ONLY FOR OWNER)
+                          if (isOwner)
+                            InkWell(
+                              onTap: () {
+                                _showDeleteCommentDialog(
+                                  context,
+                                  ref,
+                                  commentId,
+                                );
+                              },
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 6),
+                                child: Icon(
+                                  Icons.more_vert,
+                                  size: 18,
+                                  color: Colors.grey[600],
                                 ),
                               ),
-                              TextSpan(text: c['text']),
-                            ],
-                          ),
-                        ),
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -116,7 +134,7 @@ class _CommentInputState extends State<_CommentInput> {
     final user = FirebaseAuth.instance.currentUser;
 
     return SafeArea(
-      top: false, 
+      top: false,
       child: Padding(
         padding: EdgeInsets.only(
           left: 12,
@@ -141,7 +159,9 @@ class _CommentInputState extends State<_CommentInput> {
             IconButton(
               icon: const Icon(Icons.send),
               onPressed: () async {
-                if (user == null || controller.text.trim().isEmpty) return;
+                if (user == null || controller.text.trim().isEmpty) {
+                  return;
+                }
 
                 final ref = FirebaseDatabase.instance
                     .ref('post_comments/${widget.postId}')

@@ -31,18 +31,24 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _loadSpecies() {
-    _db.child('fish').onValue.listen((event) {
-      List<Map<dynamic, dynamic>> species = [];
-      if (event.snapshot.exists) {
-        Map<dynamic, dynamic> speciesMap = event.snapshot.value as Map;
-        speciesMap.forEach((key, value) {
-          species.add(Map<dynamic, dynamic>.from(value));
-        });
-      }
+  final fishRef = _db.child('fish');
 
-      setState(() {
-        allSpecies = species;
-        _filterSpecies();
+  // Keep this path fresh in the local cache
+  fishRef.keepSynced(true);
+
+  fishRef.onValue.listen((event) {
+    List<Map<dynamic, dynamic>> species = [];
+
+    if (event.snapshot.exists && event.snapshot.value != null) {
+      final speciesMap = event.snapshot.value as Map<dynamic, dynamic>;
+      speciesMap.forEach((key, value) {
+        species.add(Map<dynamic, dynamic>.from(value));
+      });
+    }
+
+    setState(() {
+      allSpecies = species;
+      _filterSpecies();
       });
     });
   }

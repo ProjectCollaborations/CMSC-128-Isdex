@@ -15,7 +15,7 @@ void main() async {
   FirebaseDatabase.instance.setPersistenceEnabled(true);
   FirebaseDatabase.instance.setPersistenceCacheSizeBytes(10 * 1024 * 1024);
 
-  // await DatabaseInitService().initializeAllData();
+  await DatabaseInitService().initializeAllData();
 
   runApp(const MyApp());
 }
