@@ -97,7 +97,7 @@ isdex/
 | Folder | MVVM Role | Description |
 |---|---|---|
 | `models/` | **Model** | Plain Dart objects representing app data. No logic, no Firebase. |
-| `viewmodels/` | **ViewModel** | State holders using `ChangeNotifier` or `Riverpod`. Own all Firebase calls and business logic. |
+| `viewmodels/` | **ViewModel** | State holders using provider. Own all Firebase calls and business logic. |
 | `views/` | **View** | Flutter widgets only. Read state from ViewModels and dispatch user events to them. |
 | `core/constants/` | **Shared Config** | Centralizes Firebase node strings to avoid magic strings scattered across ViewModels. |
 | `core/widgets/` | **Shared UI** | Reusable UI components not tied to any specific screen. |
