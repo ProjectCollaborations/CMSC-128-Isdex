@@ -37,9 +37,10 @@ The system is being refactored toward an **MVVM (Model-View-ViewModel)** archite
 |---|---|
 | **Model** | Represents app data as plain Dart objects. No UI, no Firebase logic. |
 | **View** | Renders UI widgets. Observes and reacts to ViewModel state. No business logic. |
-| **ViewModel** | Holds UI state, applies business logic, and communicates directly with Firebase. |
+| **ViewModel** | Holds UI state, applies business logic, and calls the repository to communicate with Firebase. |
+| **Repository** |The "middleman." It talks to Firebase, handles data caching, and and also updates the Firebase Database.|
 
-This pattern is appropriate for isdex because the app has clear data-driven screens (map, sighting form, profile), real-time streams that need centralized state management, and authentication logic that should not bleed into individual widgets.
+This pattern is appropriate for IsDex because the app has clear data-driven screens (map, sighting form, profile), real-time streams that need centralized state management, and authentication logic that should not bleed into individual widgets.
 
 ---
 
