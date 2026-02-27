@@ -18,7 +18,6 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isLoading = false;
 
   Future<void> _handleSignUp() async {
-    // Validate inputs
     if (_nameController.text.trim().isEmpty) {
       _showError('Please enter your name');
       return;
@@ -44,9 +43,7 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       await _authService.signUpWithEmail(
@@ -55,7 +52,6 @@ class _SignUpPageState extends State<SignUpPage> {
         _nameController.text.trim(),
       );
 
-      // Success - navigate back to landing page
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -68,11 +64,7 @@ class _SignUpPageState extends State<SignUpPage> {
     } catch (e) {
       _showError(_getErrorMessage(e.toString()));
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -126,27 +118,40 @@ class _SignUpPageState extends State<SignUpPage> {
                 child: Column(
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: kBackground,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                          child: Image.asset(
-                            'assets/images/isdex_logo.png',
-                            height: 40,
-                            width: 40,
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back, color: Colors.blue),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.blue[50],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'IsDex',
-                          style: TextStyle(
-                            color: kDarkNavy,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: kBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: Image.asset(
+                                  'assets/images/isdex_logo.png',
+                                  height: 40,
+                                  width: 40,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'IsDex',
+                                style: TextStyle(
+                                  color: kDarkNavy,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

@@ -163,19 +163,19 @@ class _CommentInputState extends State<_CommentInput> {
                   return;
                 }
 
+                final text = controller.text.trim();
+                controller.clear(); // Clear FIRST for instant visual feedback
+                
                 final ref = FirebaseDatabase.instance
                     .ref('post_comments/${widget.postId}')
                     .push();
 
                 await ref.set({
                   'uid': user.uid,
-                  'username':
-                      user.email?.split('@')[0] ?? 'User',
-                  'text': controller.text.trim(),
+                  'username': user.email?.split('@')[0] ?? 'User',
+                  'text': text,
                   'timePosted': ServerValue.timestamp,
                 });
-
-                controller.clear();
               },
             ),
           ],
@@ -203,8 +203,11 @@ void _showDeleteCommentDialog(
         ),
         TextButton(
           onPressed: () async {
+            Navigator.pop(context); // Close dialog FIRST
             await commentsRef.child(commentId).remove();
-            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Comment deleted')),
+            );
           },
           child: const Text(
             'Delete',
