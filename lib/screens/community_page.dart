@@ -185,17 +185,25 @@ class _PostItem extends StatelessWidget {
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
-                      builder: (_) => ListTile(
-                        leading:
-                            const Icon(Icons.delete, color: Colors.red),
-                        title: const Text('Delete post'),
-                        onTap: () async {
-                          Navigator.pop(context);
-                          final db = FirebaseDatabase.instance.ref();
-                          await db.child('community_posts/$postId').remove();
-                          await db.child('post_likes/$postId').remove();
-                          await db.child('post_comments/$postId').remove();
-                        },
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                      ),
+                      builder: (context) => SafeArea(
+                        minimum: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: const Icon(Icons.delete, color: Colors.red),
+                          title: const Text('Delete post'),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            final db = FirebaseDatabase.instance.ref();
+                            await db.child('community_posts/$postId').remove();
+                            await db.child('post_likes/$postId').remove();
+                            await db.child('post_comments/$postId').remove();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Post deleted')),
+                            );
+                          },
+                        ),
                       ),
                     );
                   },

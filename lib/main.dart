@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'firebase_options.dart'; 
 import 'services/database_init_service.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'screens/auth_gate.dart';
 
 void main() async {
@@ -10,7 +11,11 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  //await DatabaseInitService().initializeAllData();
+  // Enable offline disk persistence for Realtime Database
+  FirebaseDatabase.instance.setPersistenceEnabled(true);
+  FirebaseDatabase.instance.setPersistenceCacheSizeBytes(10 * 1024 * 1024);
+
+  // await DatabaseInitService().initializeAllData();
 
   runApp(const MyApp());
 }
@@ -20,9 +25,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'IsDex',
-      home: const AuthGate(), // Shows LandingPage for everyone
+      home: AuthGate(), // Shows LandingPage for everyone
     );
   }
 }

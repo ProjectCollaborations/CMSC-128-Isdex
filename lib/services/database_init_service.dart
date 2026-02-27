@@ -672,255 +672,158 @@ class DatabaseInitService {
     try {
 // Updated Map Locations with 2-3 locations per fish based on actual Philippine fishing areas
 
-      List<Map<String, dynamic>> mapData = [
-        // fish_1 (Yellowfin Tuna) - General Santos, Lagonoy Gulf, Occidental Mindoro
-        {'locationId': 'location_1', 'fishId': 'fish_1', 'latitude': 6.1115, 'longitude': 125.1715, 'region': 'General Santos'},
-        {'locationId': 'location_1b', 'fishId': 'fish_1', 'latitude': 13.6833, 'longitude': 123.7667, 'region': 'Lagonoy Gulf, Albay'},
-        {'locationId': 'location_1c', 'fishId': 'fish_1', 'latitude': 13.0833, 'longitude': 120.5333, 'region': 'Occidental Mindoro'},
-        
-        // fish_2 (Gray Snapper/Maya-maya) - Manila Bay, Palawan, Negros
-        {'locationId': 'location_2', 'fishId': 'fish_2', 'latitude': 14.5994, 'longitude': 120.9842, 'region': 'Manila Bay'},
-        {'locationId': 'location_2b', 'fishId': 'fish_2', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        {'locationId': 'location_2c', 'fishId': 'fish_2', 'latitude': 10.3157, 'longitude': 123.0854, 'region': 'Negros'},
-        
-        // fish_3 (Goldstripe Sardinella) - Navotas, Zamboanga, Davao Gulf
-        {'locationId': 'location_3', 'fishId': 'fish_3', 'latitude': 14.6667, 'longitude': 120.8333, 'region': 'Navotas'},
-        {'locationId': 'location_3b', 'fishId': 'fish_3', 'latitude': 6.9271, 'longitude': 122.0725, 'region': 'Zamboanga'},
-        {'locationId': 'location_3c', 'fishId': 'fish_3', 'latitude': 6.5000, 'longitude': 125.5000, 'region': 'Davao Gulf'},
-        
-        // fish_4 (Long-jawed Mackerel/Alumahan) - Visayas, Palawan, Mindanao
-        {'locationId': 'location_4', 'fishId': 'fish_4', 'latitude': 10.3157, 'longitude': 123.8854, 'region': 'Cebu'},
-        {'locationId': 'location_4b', 'fishId': 'fish_4', 'latitude': 9.5381, 'longitude': 118.7399, 'region': 'Palawan'},
-        {'locationId': 'location_4c', 'fishId': 'fish_4', 'latitude': 7.0731, 'longitude': 125.6114, 'region': 'Mindanao'},
-        
-        // fish_5 (Mackerel Scad/Galunggong) - Palawan, Manila Bay, Batangas
-        {'locationId': 'location_5', 'fishId': 'fish_5', 'latitude': 9.5381, 'longitude': 118.7399, 'region': 'Palawan'},
-        {'locationId': 'location_5b', 'fishId': 'fish_5', 'latitude': 14.5994, 'longitude': 120.9842, 'region': 'Manila Bay'},
-        {'locationId': 'location_5c', 'fishId': 'fish_5', 'latitude': 13.7565, 'longitude': 121.0583, 'region': 'Batangas'},
-        
-        // fish_6 (Threadfin Bream/Bisugo) - Mindanao, Maguindanao, Palawan
-        {'locationId': 'location_6', 'fishId': 'fish_6', 'latitude': 7.0731, 'longitude': 125.6114, 'region': 'Mindanao'},
-        {'locationId': 'location_6b', 'fishId': 'fish_6', 'latitude': 6.5244, 'longitude': 124.2118, 'region': 'Maguindanao'},
-        {'locationId': 'location_6c', 'fishId': 'fish_6', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        
-        // fish_7 (Leopard Coral Grouper/Lapu-lapu) - Palawan, Panglao Bohol, Cebu
-        {'locationId': 'location_7', 'fishId': 'fish_7', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        {'locationId': 'location_7b', 'fishId': 'fish_7', 'latitude': 9.5810, 'longitude': 123.7578, 'region': 'Panglao, Bohol'},
-        {'locationId': 'location_7c', 'fishId': 'fish_7', 'latitude': 10.3157, 'longitude': 123.8854, 'region': 'Cebu'},
-        
-        // fish_8 (Nile Tilapia) - Laguna de Bay, Taal Lake, Bicol
-        {'locationId': 'location_8', 'fishId': 'fish_8', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna de Bay'},
-        {'locationId': 'location_8b', 'fishId': 'fish_8', 'latitude': 13.9781, 'longitude': 120.9881, 'region': 'Taal Lake'},
-        {'locationId': 'location_8c', 'fishId': 'fish_8', 'latitude': 13.6833, 'longitude': 123.7667, 'region': 'Bicol'},
-        
-        // fish_9 (Milkfish/Bangus) - Dagupan, Bulacan, Iloilo
-        {'locationId': 'location_9', 'fishId': 'fish_9', 'latitude': 16.0433, 'longitude': 120.3333, 'region': 'Dagupan, Pangasinan'},
-        {'locationId': 'location_9b', 'fishId': 'fish_9', 'latitude': 14.7942, 'longitude': 120.8806, 'region': 'Bulacan'},
-        {'locationId': 'location_9c', 'fishId': 'fish_9', 'latitude': 10.7202, 'longitude': 122.5621, 'region': 'Iloilo'},
-        
-        // fish_10 (Striped Snakehead/Dalag) - Pampanga, Laguna, Mindoro
-        {'locationId': 'location_10', 'fishId': 'fish_10', 'latitude': 14.8791, 'longitude': 120.5596, 'region': 'Pampanga'},
-        {'locationId': 'location_10b', 'fishId': 'fish_10', 'latitude': 14.2691, 'longitude': 121.4113, 'region': 'Laguna'},
-        {'locationId': 'location_10c', 'fishId': 'fish_10', 'latitude': 13.1939, 'longitude': 121.2058, 'region': 'Mindoro'},
-        
-        // fish_11 (Common Carp) - Laguna, Central Luzon, Mindanao
-        {'locationId': 'location_11', 'fishId': 'fish_11', 'latitude': 14.2691, 'longitude': 121.4113, 'region': 'Laguna'},
-        {'locationId': 'location_11b', 'fishId': 'fish_11', 'latitude': 15.4833, 'longitude': 120.7167, 'region': 'Central Luzon'},
-        {'locationId': 'location_11c', 'fishId': 'fish_11', 'latitude': 7.0731, 'longitude': 125.6114, 'region': 'Mindanao'},
-        
-        // fish_12 (Asian Catfish) - Laguna, Pampanga, Mindanao
-        {'locationId': 'location_12', 'fishId': 'fish_12', 'latitude': 14.2691, 'longitude': 121.4113, 'region': 'Laguna'},
-        {'locationId': 'location_12b', 'fishId': 'fish_12', 'latitude': 14.8791, 'longitude': 120.5596, 'region': 'Pampanga'},
-        {'locationId': 'location_12c', 'fishId': 'fish_12', 'latitude': 7.0731, 'longitude': 125.6114, 'region': 'Mindanao'},
-        
-        // fish_13 (Manila Catfish/Kanduli) - Laguna, Cagayan River, Mindanao
-        {'locationId': 'location_13', 'fishId': 'fish_13', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna de Bay'},
-        {'locationId': 'location_13b', 'fishId': 'fish_13', 'latitude': 17.6132, 'longitude': 121.7270, 'region': 'Cagayan River'},
-        {'locationId': 'location_13c', 'fishId': 'fish_13', 'latitude': 8.2280, 'longitude': 124.2452, 'region': 'Mindanao Rivers'},
-        
-        // fish_14 (White Goby/Puting biya) - Laguna, Pampanga, Bicol
-        {'locationId': 'location_14', 'fishId': 'fish_14', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna de Bay'},
-        {'locationId': 'location_14b', 'fishId': 'fish_14', 'latitude': 14.8791, 'longitude': 120.5596, 'region': 'Pampanga'},
-        {'locationId': 'location_14c', 'fishId': 'fish_14', 'latitude': 13.6833, 'longitude': 123.7667, 'region': 'Bicol'},
-        
-        // fish_15 (Silver Perch/Ayungin) - Laguna, Taal, Mindanao
-        {'locationId': 'location_15', 'fishId': 'fish_15', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna de Bay'},
-        {'locationId': 'location_15b', 'fishId': 'fish_15', 'latitude': 13.9781, 'longitude': 120.9881, 'region': 'Taal Lake'},
-        {'locationId': 'location_15c', 'fishId': 'fish_15', 'latitude': 7.0731, 'longitude': 125.6114, 'region': 'Mindanao Lakes'},
-        
-        // fish_16 (Giant Gourami) - Laguna, Mindanao, Bulacan
-        {'locationId': 'location_16', 'fishId': 'fish_16', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna'},
-        {'locationId': 'location_16b', 'fishId': 'fish_16', 'latitude': 7.0731, 'longitude': 125.6114, 'region': 'Mindanao'},
-        {'locationId': 'location_16c', 'fishId': 'fish_16', 'latitude': 14.7942, 'longitude': 120.8806, 'region': 'Bulacan'},
-        
-        // fish_17 (Mudfish) - Mindoro, Pampanga, Isabela
-        {'locationId': 'location_17', 'fishId': 'fish_17', 'latitude': 13.1939, 'longitude': 121.2058, 'region': 'Mindoro'},
-        {'locationId': 'location_17b', 'fishId': 'fish_17', 'latitude': 14.8791, 'longitude': 120.5596, 'region': 'Pampanga'},
-        {'locationId': 'location_17c', 'fishId': 'fish_17', 'latitude': 16.9754, 'longitude': 121.8107, 'region': 'Isabela'},
-        
-        // fish_18 (Climbing Perch) - Marinduque, Laguna, Pampanga
-        {'locationId': 'location_18', 'fishId': 'fish_18', 'latitude': 13.4166, 'longitude': 122.0167, 'region': 'Marinduque'},
-        {'locationId': 'location_18b', 'fishId': 'fish_18', 'latitude': 14.2691, 'longitude': 121.4113, 'region': 'Laguna'},
-        {'locationId': 'location_18c', 'fishId': 'fish_18', 'latitude': 14.8791, 'longitude': 120.5596, 'region': 'Pampanga'},
-        
-        // fish_19 (Trevally) - Quezon, Batangas, Palawan
-        {'locationId': 'location_19', 'fishId': 'fish_19', 'latitude': 14.7505, 'longitude': 121.9475, 'region': 'Quezon'},
-        {'locationId': 'location_19b', 'fishId': 'fish_19', 'latitude': 13.7565, 'longitude': 121.0583, 'region': 'Batangas'},
-        {'locationId': 'location_19c', 'fishId': 'fish_19', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        
-        // fish_20 (Grouper) - Aklan, Palawan, Bohol
-        {'locationId': 'location_20', 'fishId': 'fish_20', 'latitude': 11.6901, 'longitude': 122.0001, 'region': 'Aklan'},
-        {'locationId': 'location_20b', 'fishId': 'fish_20', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        {'locationId': 'location_20c', 'fishId': 'fish_20', 'latitude': 9.8499, 'longitude': 124.1435, 'region': 'Bohol'},
-        
-        // fish_21 (Red Snapper) - Davao, Zamboanga, Palawan
-        {'locationId': 'location_21', 'fishId': 'fish_21', 'latitude': 6.9271, 'longitude': 125.4092, 'region': 'Davao'},
-        {'locationId': 'location_21b', 'fishId': 'fish_21', 'latitude': 6.9271, 'longitude': 122.0725, 'region': 'Zamboanga'},
-        {'locationId': 'location_21c', 'fishId': 'fish_21', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        
-        // fish_22 (Goatfish) - General Santos, Davao, Sarangani
-        {'locationId': 'location_22', 'fishId': 'fish_22', 'latitude': 6.1115, 'longitude': 125.1915, 'region': 'General Santos'},
-        {'locationId': 'location_22b', 'fishId': 'fish_22', 'latitude': 6.9271, 'longitude': 125.4092, 'region': 'Davao'},
-        {'locationId': 'location_22c', 'fishId': 'fish_22', 'latitude': 6.0765, 'longitude': 125.6306, 'region': 'Sarangani'},
-        
-        // fish_23 (Emperor/Bitilya) - Zamboanga, Palawan, Tawi-Tawi
-        {'locationId': 'location_23', 'fishId': 'fish_23', 'latitude': 6.9271, 'longitude': 122.0725, 'region': 'Zamboanga'},
-        {'locationId': 'location_23b', 'fishId': 'fish_23', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        {'locationId': 'location_23c', 'fishId': 'fish_23', 'latitude': 5.1291, 'longitude': 119.9582, 'region': 'Tawi-Tawi'},
-        
-        // fish_24 (Indo-Pacific Tarpon/Buan-buan) - Coron, El Nido, Busuanga
-        {'locationId': 'location_24', 'fishId': 'fish_24', 'latitude': 11.9990, 'longitude': 120.2050, 'region': 'Coron, Palawan'},
-        {'locationId': 'location_24b', 'fishId': 'fish_24', 'latitude': 11.1949, 'longitude': 119.4010, 'region': 'El Nido, Palawan'},
-        {'locationId': 'location_24c', 'fishId': 'fish_24', 'latitude': 12.1642, 'longitude': 120.0069, 'region': 'Busuanga'},
-        
-        // fish_25 (Dolphinfish/Dorado) - Sipalay, Batanes, Zambales
-        {'locationId': 'location_25', 'fishId': 'fish_25', 'latitude': 9.8509, 'longitude': 123.4197, 'region': 'Sipalay'},
-        {'locationId': 'location_25b', 'fishId': 'fish_25', 'latitude': 20.4486, 'longitude': 121.9697, 'region': 'Batanes'},
-        {'locationId': 'location_25c', 'fishId': 'fish_25', 'latitude': 15.5082, 'longitude': 119.9692, 'region': 'Zambales'},
-        
-        // fish_26 (Threadfin Salmon) - Dinagat, Surigao, Leyte Gulf
-        {'locationId': 'location_26', 'fishId': 'fish_26', 'latitude': 9.6833, 'longitude': 125.4667, 'region': 'Dinagat'},
-        {'locationId': 'location_26b', 'fishId': 'fish_26', 'latitude': 9.7883, 'longitude': 125.5040, 'region': 'Surigao'},
-        {'locationId': 'location_26c', 'fishId': 'fish_26', 'latitude': 10.9117, 'longitude': 125.0061, 'region': 'Leyte Gulf'},
-        
-        // fish_27 (Red Bigeye/Dilat) - Moalboal, Cebu, Bohol
-        {'locationId': 'location_27', 'fishId': 'fish_27', 'latitude': 9.9274, 'longitude': 123.3950, 'region': 'Moalboal, Cebu'},
-        {'locationId': 'location_27b', 'fishId': 'fish_27', 'latitude': 10.3157, 'longitude': 123.8854, 'region': 'Cebu'},
-        {'locationId': 'location_27c', 'fishId': 'fish_27', 'latitude': 9.8499, 'longitude': 124.1435, 'region': 'Bohol'},
-        
-        // fish_28 (Moonfish/Chabeta) - Surigao, Dinagat, Leyte
-        {'locationId': 'location_28', 'fishId': 'fish_28', 'latitude': 9.7883, 'longitude': 125.5040, 'region': 'Surigao'},
-        {'locationId': 'location_28b', 'fishId': 'fish_28', 'latitude': 9.6833, 'longitude': 125.4667, 'region': 'Dinagat'},
-        {'locationId': 'location_28c', 'fishId': 'fish_28', 'latitude': 10.7202, 'longitude': 124.7521, 'region': 'Leyte'},
-        
-        // fish_29 (Rabbit Fish) - Leyte, Samar, Bohol
-        {'locationId': 'location_29', 'fishId': 'fish_29', 'latitude': 10.7202, 'longitude': 124.7521, 'region': 'Leyte'},
-        {'locationId': 'location_29b', 'fishId': 'fish_29', 'latitude': 11.5799, 'longitude': 125.0060, 'region': 'Samar'},
-        {'locationId': 'location_29c', 'fishId': 'fish_29', 'latitude': 9.8499, 'longitude': 124.1435, 'region': 'Bohol'},
-        
-        // fish_30 (Surgeonfish) - Cebu, Bohol, Palawan
-        {'locationId': 'location_30', 'fishId': 'fish_30', 'latitude': 10.3157, 'longitude': 123.8854, 'region': 'Cebu'},
-        {'locationId': 'location_30b', 'fishId': 'fish_30', 'latitude': 9.8499, 'longitude': 124.1435, 'region': 'Bohol'},
-        {'locationId': 'location_30c', 'fishId': 'fish_30', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        
-        // fish_31 (Butterflyfish) - Bohol, Cebu, Palawan
-        {'locationId': 'location_31', 'fishId': 'fish_31', 'latitude': 9.8499, 'longitude': 124.1435, 'region': 'Bohol'},
-        {'locationId': 'location_31b', 'fishId': 'fish_31', 'latitude': 10.3157, 'longitude': 123.8854, 'region': 'Cebu'},
-        {'locationId': 'location_31c', 'fishId': 'fish_31', 'latitude': 9.7604, 'longitude': 118.7282, 'region': 'Palawan'},
-        
-        // fish_32 (Damselfish) - Butuan, Surigao, Leyte
-        {'locationId': 'location_32', 'fishId': 'fish_32', 'latitude': 8.9475, 'longitude': 125.5406, 'region': 'Butuan'},
-        {'locationId': 'location_32b', 'fishId': 'fish_32', 'latitude': 9.7883, 'longitude': 125.5040, 'region': 'Surigao'},
-        {'locationId': 'location_32c', 'fishId': 'fish_32', 'latitude': 10.7202, 'longitude': 124.7521, 'region': 'Leyte'},
-        
-        // fish_33 (Wrasse) - Tandag, Surigao, Siargao
-        {'locationId': 'location_33', 'fishId': 'fish_33', 'latitude': 9.0781, 'longitude': 126.1959, 'region': 'Tandag'},
-        {'locationId': 'location_33b', 'fishId': 'fish_33', 'latitude': 9.7883, 'longitude': 125.5040, 'region': 'Surigao'},
-        {'locationId': 'location_33c', 'fishId': 'fish_33', 'latitude': 9.8599, 'longitude': 126.0459, 'region': 'Siargao'},
-        
-        // fish_34 (Parrotfish) - Cotabato, Davao Gulf, General Santos
-        {'locationId': 'location_34', 'fishId': 'fish_34', 'latitude': 7.2004, 'longitude': 124.2452, 'region': 'Cotabato'},
-        {'locationId': 'location_34b', 'fishId': 'fish_34', 'latitude': 6.5000, 'longitude': 125.5000, 'region': 'Davao Gulf'},
-        {'locationId': 'location_34c', 'fishId': 'fish_34', 'latitude': 6.1115, 'longitude': 125.1915, 'region': 'General Santos'},
-        
-        // fish_35 (Sweetlip) - Maguindanao, Zamboanga, Basilan
-        {'locationId': 'location_35', 'fishId': 'fish_35', 'latitude': 6.9463, 'longitude': 124.4086, 'region': 'Maguindanao'},
-        {'locationId': 'location_35b', 'fishId': 'fish_35', 'latitude': 6.9271, 'longitude': 122.0725, 'region': 'Zamboanga'},
-        {'locationId': 'location_35c', 'fishId': 'fish_35', 'latitude': 6.5389, 'longitude': 121.9733, 'region': 'Basilan'},
-        
-        // fish_36 (Barracuda) - Cotabato City, Zamboanga, Davao
-        {'locationId': 'location_36', 'fishId': 'fish_36', 'latitude': 7.2004, 'longitude': 124.2452, 'region': 'Cotabato City'},
-        {'locationId': 'location_36b', 'fishId': 'fish_36', 'latitude': 6.9271, 'longitude': 122.0725, 'region': 'Zamboanga'},
-        {'locationId': 'location_36c', 'fishId': 'fish_36', 'latitude': 6.9271, 'longitude': 125.4092, 'region': 'Davao'},
-        
-        // fish_37 (Jack) - Bislig, Hinatuan, Tandag
-        {'locationId': 'location_37', 'fishId': 'fish_37', 'latitude': 8.2111, 'longitude': 126.3214, 'region': 'Bislig'},
-        {'locationId': 'location_37b', 'fishId': 'fish_37', 'latitude': 8.3795, 'longitude': 126.3558, 'region': 'Hinatuan'},
-        {'locationId': 'location_37c', 'fishId': 'fish_37', 'latitude': 9.0781, 'longitude': 126.1959, 'region': 'Tandag'},
-        
-        // fish_38 (Asian Seabass/Barramundi) - Bunawan, Agusan, Butuan
-        {'locationId': 'location_38', 'fishId': 'fish_38', 'latitude': 8.1344, 'longitude': 126.0455, 'region': 'Bunawan'},
-        {'locationId': 'location_38b', 'fishId': 'fish_38', 'latitude': 8.9475, 'longitude': 125.5406, 'region': 'Agusan River'},
-        {'locationId': 'location_38c', 'fishId': 'fish_38', 'latitude': 8.9475, 'longitude': 125.5406, 'region': 'Butuan Bay'},
-        
-        // fish_39 (Eel) - Tandag Bay, Laguna, Mindoro
-        {'locationId': 'location_39', 'fishId': 'fish_39', 'latitude': 9.0781, 'longitude': 126.1959, 'region': 'Tandag Bay'},
-        {'locationId': 'location_39b', 'fishId': 'fish_39', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna'},
-        {'locationId': 'location_39c', 'fishId': 'fish_39', 'latitude': 13.1939, 'longitude': 121.2058, 'region': 'Mindoro'},
-        
-        // fish_40 (Halfbeak) - Southern Leyte, Surigao, Bohol
-        {'locationId': 'location_40', 'fishId': 'fish_40', 'latitude': 10.3333, 'longitude': 125.1667, 'region': 'Southern Leyte'},
-        {'locationId': 'location_40b', 'fishId': 'fish_40', 'latitude': 9.7883, 'longitude': 125.5040, 'region': 'Surigao'},
-        {'locationId': 'location_40c', 'fishId': 'fish_40', 'latitude': 9.8499, 'longitude': 124.1435, 'region': 'Bohol'},
-        
-        // fish_41 (Needlefish) - Panay, Aklan, Antique
-        {'locationId': 'location_41', 'fishId': 'fish_41', 'latitude': 11.5564, 'longitude': 122.5136, 'region': 'Panay'},
-        {'locationId': 'location_41b', 'fishId': 'fish_41', 'latitude': 11.6901, 'longitude': 122.0001, 'region': 'Aklan'},
-        {'locationId': 'location_41c', 'fishId': 'fish_41', 'latitude': 11.0333, 'longitude': 122.0000, 'region': 'Antique'},
-        // fish_42 (Flying Fish) – open coastal waters
-        {'locationId': 'location_42',  'fishId': 'fish_42', 'latitude': 13.5000, 'longitude': 123.0000, 'region': 'Philippine Sea off Bicol'},
-        {'locationId': 'location_42b', 'fishId': 'fish_42', 'latitude': 10.5000, 'longitude': 124.5000, 'region': 'Visayan Sea'},
-        {'locationId': 'location_42c', 'fishId': 'fish_42', 'latitude': 8.5000,  'longitude': 126.0000, 'region': 'Offshore Surigao / Pacific side'},
-        // fish_43 (Seahorse) – seagrass & reef areas
-        {'locationId': 'location_43',  'fishId': 'fish_43', 'latitude': 9.5810,  'longitude': 123.7578, 'region': 'Panglao, Bohol'},
-        {'locationId': 'location_43b', 'fishId': 'fish_43', 'latitude': 11.1949, 'longitude': 119.4010, 'region': 'El Nido, Palawan'},
-        {'locationId': 'location_43c', 'fishId': 'fish_43', 'latitude': 9.9274,  'longitude': 123.3950, 'region': 'Moalboal, Cebu'},
-
-        // fish_44 (Sea Dragon) – similar sheltered reef habitats
-        {'locationId': 'location_44',  'fishId': 'fish_44', 'latitude': 9.8509,  'longitude': 123.4197, 'region': 'Sipalay, Negros'},
-        {'locationId': 'location_44b', 'fishId': 'fish_44', 'latitude': 11.9990, 'longitude': 120.2050, 'region': 'Coron, Palawan'},
-        {'locationId': 'location_44c', 'fishId': 'fish_44', 'latitude': 9.3031,  'longitude': 123.3056, 'region': 'Oslob, Cebu'},
-
-        // fish_45 (Pufferfish) – coral reef zones
-        {'locationId': 'location_45',  'fishId': 'fish_45', 'latitude': 9.0442,  'longitude': 123.2925, 'region': 'Apo Island, Negros'},
-        {'locationId': 'location_45b', 'fishId': 'fish_45', 'latitude': 10.3157, 'longitude': 123.8854, 'region': 'Cebu Reefs'},
-        {'locationId': 'location_45c', 'fishId': 'fish_45', 'latitude': 11.9673, 'longitude': 121.9247, 'region': 'Boracay, Aklan'},
-
-        // fish_46 (Porcupinefish) – outer reef slopes
-        {'locationId': 'location_46',  'fishId': 'fish_46', 'latitude': 9.7604,  'longitude': 118.7282, 'region': 'Puerto Princesa, Palawan'},
-        {'locationId': 'location_46b', 'fishId': 'fish_46', 'latitude': 10.1964, 'longitude': 123.7618, 'region': 'Camotes Sea'},
-        {'locationId': 'location_46c', 'fishId': 'location_46c', 'latitude': 11.2000, 'longitude': 125.0050, 'region': 'Southern Leyte Reefs'},
-
-        // fish_47 (Boxfish) – lagoon and reef flats
-        {'locationId': 'location_47',  'fishId': 'fish_47', 'latitude': 9.8499,  'longitude': 124.1435, 'region': 'Bohol Reefs'},
-        {'locationId': 'location_47b', 'fishId': 'fish_47', 'latitude': 11.5564, 'longitude': 122.5136, 'region': 'Panay Reefs'},
-        {'locationId': 'location_47c', 'fishId': 'fish_47', 'latitude': 5.9788,  'longitude': 126.0245, 'region': 'Davao Oriental Reefs'},
-
-        // fish_48 (Pomfret) – deeper coastal waters
-        {'locationId': 'location_48',  'fishId': 'fish_48', 'latitude': 10.7202, 'longitude': 124.7521, 'region': 'Leyte Gulf'},
-        {'locationId': 'location_48b', 'fishId': 'fish_48', 'latitude': 11.5799, 'longitude': 125.0060, 'region': 'Samar Sea'},
-        {'locationId': 'location_48c', 'fishId': 'fish_48', 'latitude': 15.5082, 'longitude': 119.9692, 'region': 'West Philippine Sea off Zambales'},
-
-        // fish_49 (Ribbonfish) – offshore shelf areas
-        {'locationId': 'location_49',  'fishId': 'fish_49', 'latitude': 13.0833, 'longitude': 120.5333, 'region': 'Occidental Mindoro Shelf'},
-        {'locationId': 'location_49b', 'fishId': 'fish_49', 'latitude': 16.0433, 'longitude': 120.3333, 'region': 'Lingayen Gulf Offshore'},
-        {'locationId': 'location_49c', 'fishId': 'fish_49', 'latitude': 6.5000,  'longitude': 125.5000, 'region': 'Davao Gulf Slope'},
-
-        // fish_50 (Spotted Scat/Kitang) – brackish estuaries
-        {'locationId': 'location_50',  'fishId': 'fish_50', 'latitude': 14.3127, 'longitude': 121.1978, 'region': 'Laguna de Bay River Mouths'},
-        {'locationId': 'location_50b', 'fishId': 'fish_50', 'latitude': 14.5994, 'longitude': 120.9842, 'region': 'Manila Bay Estuaries'},
-        {'locationId': 'location_50c', 'fishId': 'fish_50', 'latitude': 9.7457,  'longitude': 118.7302, 'region': 'Puerto Princesa Bay Mangroves'},
-      ];
+       List<Map<String, dynamic>> mapData = [
+    {'locationId': 'location_1', 'fishId': 'fish_1', 'latitude': 6.111500, 'longitude': 125.171500, 'region': 'General Santos'},
+    {'locationId': 'location_1b', 'fishId': 'fish_1', 'latitude': 13.683300, 'longitude': 123.766700, 'region': 'Lagonoy Gulf, Albay'},
+    {'locationId': 'location_1c', 'fishId': 'fish_1', 'latitude': 13.083300, 'longitude': 120.533300, 'region': 'Occidental Mindoro'},
+    {'locationId': 'location_2', 'fishId': 'fish_2', 'latitude': 14.599400, 'longitude': 120.984200, 'region': 'Manila Bay'},
+    {'locationId': 'location_2b', 'fishId': 'fish_2', 'latitude': 9.760400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_2c', 'fishId': 'fish_2', 'latitude': 10.315700, 'longitude': 123.085400, 'region': 'Negros'},
+    {'locationId': 'location_3', 'fishId': 'fish_3', 'latitude': 14.666700, 'longitude': 120.833300, 'region': 'Navotas'},
+    {'locationId': 'location_3b', 'fishId': 'fish_3', 'latitude': 6.927100, 'longitude': 122.072500, 'region': 'Zamboanga'},
+    {'locationId': 'location_3c', 'fishId': 'fish_3', 'latitude': 6.500000, 'longitude': 125.500000, 'region': 'Davao Gulf'},
+    {'locationId': 'location_4', 'fishId': 'fish_4', 'latitude': 10.315700, 'longitude': 123.885400, 'region': 'Cebu'},
+    {'locationId': 'location_4b', 'fishId': 'fish_4', 'latitude': 9.538100, 'longitude': 118.739900, 'region': 'Palawan'},
+    {'locationId': 'location_4c', 'fishId': 'fish_4', 'latitude': 7.073100, 'longitude': 125.611400, 'region': 'Mindanao'},
+    {'locationId': 'location_5', 'fishId': 'fish_5', 'latitude': 9.548100, 'longitude': 118.739900, 'region': 'Palawan'},
+    {'locationId': 'location_5b', 'fishId': 'fish_5', 'latitude': 14.609400, 'longitude': 120.984200, 'region': 'Manila Bay'},
+    {'locationId': 'location_5c', 'fishId': 'fish_5', 'latitude': 13.756500, 'longitude': 121.058300, 'region': 'Batangas'},
+    {'locationId': 'location_6', 'fishId': 'fish_6', 'latitude': 7.083100, 'longitude': 125.611400, 'region': 'Mindanao'},
+    {'locationId': 'location_6b', 'fishId': 'fish_6', 'latitude': 6.524400, 'longitude': 124.211800, 'region': 'Maguindanao'},
+    {'locationId': 'location_6c', 'fishId': 'fish_6', 'latitude': 9.770400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_7', 'fishId': 'fish_7', 'latitude': 9.780400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_7b', 'fishId': 'fish_7', 'latitude': 9.581000, 'longitude': 123.757800, 'region': 'Panglao, Bohol'},
+    {'locationId': 'location_7c', 'fishId': 'fish_7', 'latitude': 10.325700, 'longitude': 123.885400, 'region': 'Cebu'},
+    {'locationId': 'location_8', 'fishId': 'fish_8', 'latitude': 14.312700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
+    {'locationId': 'location_8b', 'fishId': 'fish_8', 'latitude': 13.978100, 'longitude': 120.988100, 'region': 'Taal Lake'},
+    {'locationId': 'location_8c', 'fishId': 'fish_8', 'latitude': 13.693300, 'longitude': 123.766700, 'region': 'Bicol'},
+    {'locationId': 'location_9', 'fishId': 'fish_9', 'latitude': 16.043300, 'longitude': 120.333300, 'region': 'Dagupan, Pangasinan'},
+    {'locationId': 'location_9b', 'fishId': 'fish_9', 'latitude': 14.794200, 'longitude': 120.880600, 'region': 'Bulacan'},
+    {'locationId': 'location_9c', 'fishId': 'fish_9', 'latitude': 10.720200, 'longitude': 122.562100, 'region': 'Iloilo'},
+    {'locationId': 'location_10', 'fishId': 'fish_10', 'latitude': 14.879100, 'longitude': 120.559600, 'region': 'Pampanga'},
+    {'locationId': 'location_10b', 'fishId': 'fish_10', 'latitude': 14.269100, 'longitude': 121.411300, 'region': 'Laguna'},
+    {'locationId': 'location_10c', 'fishId': 'fish_10', 'latitude': 13.193900, 'longitude': 121.205800, 'region': 'Mindoro'},
+    {'locationId': 'location_11', 'fishId': 'fish_11', 'latitude': 14.279100, 'longitude': 121.411300, 'region': 'Laguna'},
+    {'locationId': 'location_11b', 'fishId': 'fish_11', 'latitude': 15.483300, 'longitude': 120.716700, 'region': 'Central Luzon'},
+    {'locationId': 'location_11c', 'fishId': 'fish_11', 'latitude': 7.093100, 'longitude': 125.611400, 'region': 'Mindanao'},
+    {'locationId': 'location_12', 'fishId': 'fish_12', 'latitude': 14.289100, 'longitude': 121.411300, 'region': 'Laguna'},
+    {'locationId': 'location_12b', 'fishId': 'fish_12', 'latitude': 14.889100, 'longitude': 120.559600, 'region': 'Pampanga'},
+    {'locationId': 'location_12c', 'fishId': 'fish_12', 'latitude': 7.103100, 'longitude': 125.611400, 'region': 'Mindanao'},
+    {'locationId': 'location_13', 'fishId': 'fish_13', 'latitude': 14.322700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
+    {'locationId': 'location_13b', 'fishId': 'fish_13', 'latitude': 17.613200, 'longitude': 121.727000, 'region': 'Cagayan River'},
+    {'locationId': 'location_13c', 'fishId': 'fish_13', 'latitude': 8.228000, 'longitude': 124.245200, 'region': 'Mindanao Rivers'},
+    {'locationId': 'location_14', 'fishId': 'fish_14', 'latitude': 14.332700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
+    {'locationId': 'location_14b', 'fishId': 'fish_14', 'latitude': 14.899100, 'longitude': 120.559600, 'region': 'Pampanga'},
+    {'locationId': 'location_14c', 'fishId': 'fish_14', 'latitude': 13.703300, 'longitude': 123.766700, 'region': 'Bicol'},
+    {'locationId': 'location_15', 'fishId': 'fish_15', 'latitude': 14.342700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
+    {'locationId': 'location_15b', 'fishId': 'fish_15', 'latitude': 13.988100, 'longitude': 120.988100, 'region': 'Taal Lake'},
+    {'locationId': 'location_15c', 'fishId': 'fish_15', 'latitude': 7.113100, 'longitude': 125.611400, 'region': 'Mindanao Lakes'},
+    {'locationId': 'location_16', 'fishId': 'fish_16', 'latitude': 14.352700, 'longitude': 121.197800, 'region': 'Laguna'},
+    {'locationId': 'location_16b', 'fishId': 'fish_16', 'latitude': 7.123100, 'longitude': 125.611400, 'region': 'Mindanao'},
+    {'locationId': 'location_16c', 'fishId': 'fish_16', 'latitude': 14.804200, 'longitude': 120.880600, 'region': 'Bulacan'},
+    {'locationId': 'location_17', 'fishId': 'fish_17', 'latitude': 13.203900, 'longitude': 121.205800, 'region': 'Mindoro'},
+    {'locationId': 'location_17b', 'fishId': 'fish_17', 'latitude': 14.909100, 'longitude': 120.559600, 'region': 'Pampanga'},
+    {'locationId': 'location_17c', 'fishId': 'fish_17', 'latitude': 16.975400, 'longitude': 121.810700, 'region': 'Isabela'},
+    {'locationId': 'location_18', 'fishId': 'fish_18', 'latitude': 13.416600, 'longitude': 122.016700, 'region': 'Marinduque'},
+    {'locationId': 'location_18b', 'fishId': 'fish_18', 'latitude': 14.299100, 'longitude': 121.411300, 'region': 'Laguna'},
+    {'locationId': 'location_18c', 'fishId': 'fish_18', 'latitude': 14.919100, 'longitude': 120.559600, 'region': 'Pampanga'},
+    {'locationId': 'location_19', 'fishId': 'fish_19', 'latitude': 14.750500, 'longitude': 121.947500, 'region': 'Quezon'},
+    {'locationId': 'location_19b', 'fishId': 'fish_19', 'latitude': 13.766500, 'longitude': 121.058300, 'region': 'Batangas'},
+    {'locationId': 'location_19c', 'fishId': 'fish_19', 'latitude': 9.790400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_20', 'fishId': 'fish_20', 'latitude': 11.690100, 'longitude': 122.000100, 'region': 'Aklan'},
+    {'locationId': 'location_20b', 'fishId': 'fish_20', 'latitude': 9.800400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_20c', 'fishId': 'fish_20', 'latitude': 9.849900, 'longitude': 124.143500, 'region': 'Bohol'},
+    {'locationId': 'location_21', 'fishId': 'fish_21', 'latitude': 6.927100, 'longitude': 125.409200, 'region': 'Davao'},
+    {'locationId': 'location_21b', 'fishId': 'fish_21', 'latitude': 6.937100, 'longitude': 122.072500, 'region': 'Zamboanga'},
+    {'locationId': 'location_21c', 'fishId': 'fish_21', 'latitude': 9.810400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_22', 'fishId': 'fish_22', 'latitude': 6.111500, 'longitude': 125.191500, 'region': 'General Santos'},
+    {'locationId': 'location_22b', 'fishId': 'fish_22', 'latitude': 6.937100, 'longitude': 125.409200, 'region': 'Davao'},
+    {'locationId': 'location_22c', 'fishId': 'fish_22', 'latitude': 6.076500, 'longitude': 125.630600, 'region': 'Sarangani'},
+    {'locationId': 'location_23', 'fishId': 'fish_23', 'latitude': 6.947100, 'longitude': 122.072500, 'region': 'Zamboanga'},
+    {'locationId': 'location_23b', 'fishId': 'fish_23', 'latitude': 9.820400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_23c', 'fishId': 'fish_23', 'latitude': 5.129100, 'longitude': 119.958200, 'region': 'Tawi-Tawi'},
+    {'locationId': 'location_24', 'fishId': 'fish_24', 'latitude': 11.999000, 'longitude': 120.205000, 'region': 'Coron, Palawan'},
+    {'locationId': 'location_24b', 'fishId': 'fish_24', 'latitude': 11.194900, 'longitude': 119.401000, 'region': 'El Nido, Palawan'},
+    {'locationId': 'location_24c', 'fishId': 'fish_24', 'latitude': 12.164200, 'longitude': 120.006900, 'region': 'Busuanga'},
+    {'locationId': 'location_25', 'fishId': 'fish_25', 'latitude': 9.850900, 'longitude': 123.419700, 'region': 'Sipalay'},
+    {'locationId': 'location_25b', 'fishId': 'fish_25', 'latitude': 20.448600, 'longitude': 121.969700, 'region': 'Batanes'},
+    {'locationId': 'location_25c', 'fishId': 'fish_25', 'latitude': 15.508200, 'longitude': 119.969200, 'region': 'Zambales'},
+    {'locationId': 'location_26', 'fishId': 'fish_26', 'latitude': 9.683300, 'longitude': 125.466700, 'region': 'Dinagat'},
+    {'locationId': 'location_26b', 'fishId': 'fish_26', 'latitude': 9.788300, 'longitude': 125.504000, 'region': 'Surigao'},
+    {'locationId': 'location_26c', 'fishId': 'fish_26', 'latitude': 10.911700, 'longitude': 125.006100, 'region': 'Leyte Gulf'},
+    {'locationId': 'location_27', 'fishId': 'fish_27', 'latitude': 9.927400, 'longitude': 123.395000, 'region': 'Moalboal, Cebu'},
+    {'locationId': 'location_27b', 'fishId': 'fish_27', 'latitude': 10.335700, 'longitude': 123.885400, 'region': 'Cebu'},
+    {'locationId': 'location_27c', 'fishId': 'fish_27', 'latitude': 9.859900, 'longitude': 124.143500, 'region': 'Bohol'},
+    {'locationId': 'location_28', 'fishId': 'fish_28', 'latitude': 9.798300, 'longitude': 125.504000, 'region': 'Surigao'},
+    {'locationId': 'location_28b', 'fishId': 'fish_28', 'latitude': 9.693300, 'longitude': 125.466700, 'region': 'Dinagat'},
+    {'locationId': 'location_28c', 'fishId': 'fish_28', 'latitude': 10.720200, 'longitude': 124.752100, 'region': 'Leyte'},
+    {'locationId': 'location_29', 'fishId': 'fish_29', 'latitude': 10.730200, 'longitude': 124.752100, 'region': 'Leyte'},
+    {'locationId': 'location_29b', 'fishId': 'fish_29', 'latitude': 11.579900, 'longitude': 125.006000, 'region': 'Samar'},
+    {'locationId': 'location_29c', 'fishId': 'fish_29', 'latitude': 9.869900, 'longitude': 124.143500, 'region': 'Bohol'},
+    {'locationId': 'location_30', 'fishId': 'fish_30', 'latitude': 10.345700, 'longitude': 123.885400, 'region': 'Cebu'},
+    {'locationId': 'location_30b', 'fishId': 'fish_30', 'latitude': 9.879900, 'longitude': 124.143500, 'region': 'Bohol'},
+    {'locationId': 'location_30c', 'fishId': 'fish_30', 'latitude': 9.830400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_31', 'fishId': 'fish_31', 'latitude': 9.889900, 'longitude': 124.143500, 'region': 'Bohol'},
+    {'locationId': 'location_31b', 'fishId': 'fish_31', 'latitude': 10.355700, 'longitude': 123.885400, 'region': 'Cebu'},
+    {'locationId': 'location_31c', 'fishId': 'fish_31', 'latitude': 9.840400, 'longitude': 118.728200, 'region': 'Palawan'},
+    {'locationId': 'location_32', 'fishId': 'fish_32', 'latitude': 8.947500, 'longitude': 125.540600, 'region': 'Butuan'},
+    {'locationId': 'location_32b', 'fishId': 'fish_32', 'latitude': 9.808300, 'longitude': 125.504000, 'region': 'Surigao'},
+    {'locationId': 'location_32c', 'fishId': 'fish_32', 'latitude': 10.740200, 'longitude': 124.752100, 'region': 'Leyte'},
+    {'locationId': 'location_33', 'fishId': 'fish_33', 'latitude': 9.078100, 'longitude': 126.195900, 'region': 'Tandag'},
+    {'locationId': 'location_33b', 'fishId': 'fish_33', 'latitude': 9.818300, 'longitude': 125.504000, 'region': 'Surigao'},
+    {'locationId': 'location_33c', 'fishId': 'fish_33', 'latitude': 9.859900, 'longitude': 126.045900, 'region': 'Siargao'},
+    {'locationId': 'location_34', 'fishId': 'fish_34', 'latitude': 7.200400, 'longitude': 124.245200, 'region': 'Cotabato'},
+    {'locationId': 'location_34b', 'fishId': 'fish_34', 'latitude': 6.510000, 'longitude': 125.500000, 'region': 'Davao Gulf'},
+    {'locationId': 'location_34c', 'fishId': 'fish_34', 'latitude': 6.121500, 'longitude': 125.191500, 'region': 'General Santos'},
+    {'locationId': 'location_35', 'fishId': 'fish_35', 'latitude': 6.946300, 'longitude': 124.408600, 'region': 'Maguindanao'},
+    {'locationId': 'location_35b', 'fishId': 'fish_35', 'latitude': 6.957100, 'longitude': 122.072500, 'region': 'Zamboanga'},
+    {'locationId': 'location_35c', 'fishId': 'fish_35', 'latitude': 6.538900, 'longitude': 121.973300, 'region': 'Basilan'},
+    {'locationId': 'location_36', 'fishId': 'fish_36', 'latitude': 7.210400, 'longitude': 124.245200, 'region': 'Cotabato City'},
+    {'locationId': 'location_36b', 'fishId': 'fish_36', 'latitude': 6.967100, 'longitude': 122.072500, 'region': 'Zamboanga'},
+    {'locationId': 'location_36c', 'fishId': 'fish_36', 'latitude': 6.947100, 'longitude': 125.409200, 'region': 'Davao'},
+    {'locationId': 'location_37', 'fishId': 'fish_37', 'latitude': 8.211100, 'longitude': 126.321400, 'region': 'Bislig'},
+    {'locationId': 'location_37b', 'fishId': 'fish_37', 'latitude': 8.379500, 'longitude': 126.355800, 'region': 'Hinatuan'},
+    {'locationId': 'location_37c', 'fishId': 'fish_37', 'latitude': 9.088100, 'longitude': 126.195900, 'region': 'Tandag'},
+    {'locationId': 'location_38', 'fishId': 'fish_38', 'latitude': 8.134400, 'longitude': 126.045500, 'region': 'Bunawan'},
+    {'locationId': 'location_38b', 'fishId': 'fish_38', 'latitude': 8.957500, 'longitude': 125.540600, 'region': 'Agusan River'},
+    {'locationId': 'location_38c', 'fishId': 'fish_38', 'latitude': 8.967500, 'longitude': 125.540600, 'region': 'Butuan Bay'},
+    {'locationId': 'location_39', 'fishId': 'fish_39', 'latitude': 9.098100, 'longitude': 126.195900, 'region': 'Tandag Bay'},
+    {'locationId': 'location_39b', 'fishId': 'fish_39', 'latitude': 14.362700, 'longitude': 121.197800, 'region': 'Laguna'},
+    {'locationId': 'location_39c', 'fishId': 'fish_39', 'latitude': 13.213900, 'longitude': 121.205800, 'region': 'Mindoro'},
+    {'locationId': 'location_40', 'fishId': 'fish_40', 'latitude': 10.333300, 'longitude': 125.166700, 'region': 'Southern Leyte'},
+    {'locationId': 'location_40b', 'fishId': 'fish_40', 'latitude': 9.828300, 'longitude': 125.504000, 'region': 'Surigao'},
+    {'locationId': 'location_40c', 'fishId': 'fish_40', 'latitude': 9.899900, 'longitude': 124.143500, 'region': 'Bohol'},
+    {'locationId': 'location_41', 'fishId': 'fish_41', 'latitude': 11.556400, 'longitude': 122.513600, 'region': 'Panay'},
+    {'locationId': 'location_41b', 'fishId': 'fish_41', 'latitude': 11.700100, 'longitude': 122.000100, 'region': 'Aklan'},
+    {'locationId': 'location_41c', 'fishId': 'fish_41', 'latitude': 11.033300, 'longitude': 122.000000, 'region': 'Antique'},
+    {'locationId': 'location_42', 'fishId': 'fish_42', 'latitude': 13.500000, 'longitude': 123.000000, 'region': 'Philippine Sea off Bicol'},
+    {'locationId': 'location_42b', 'fishId': 'fish_42', 'latitude': 10.500000, 'longitude': 124.500000, 'region': 'Visayan Sea'},
+    {'locationId': 'location_42c', 'fishId': 'fish_42', 'latitude': 8.500000, 'longitude': 126.000000, 'region': 'Offshore Surigao / Pacific side'},     
+    {'locationId': 'location_43', 'fishId': 'fish_43', 'latitude': 9.591000, 'longitude': 123.757800, 'region': 'Panglao, Bohol'},
+    {'locationId': 'location_43b', 'fishId': 'fish_43', 'latitude': 11.204900, 'longitude': 119.401000, 'region': 'El Nido, Palawan'},
+    {'locationId': 'location_43c', 'fishId': 'fish_43', 'latitude': 9.937400, 'longitude': 123.395000, 'region': 'Moalboal, Cebu'},
+    {'locationId': 'location_44', 'fishId': 'fish_44', 'latitude': 9.860900, 'longitude': 123.419700, 'region': 'Sipalay, Negros'},
+    {'locationId': 'location_44b', 'fishId': 'fish_44', 'latitude': 12.009000, 'longitude': 120.205000, 'region': 'Coron, Palawan'},
+    {'locationId': 'location_44c', 'fishId': 'fish_44', 'latitude': 9.303100, 'longitude': 123.305600, 'region': 'Oslob, Cebu'},
+    {'locationId': 'location_45', 'fishId': 'fish_45', 'latitude': 9.044200, 'longitude': 123.292500, 'region': 'Apo Island, Negros'},
+    {'locationId': 'location_45b', 'fishId': 'fish_45', 'latitude': 10.365700, 'longitude': 123.885400, 'region': 'Cebu Reefs'},
+    {'locationId': 'location_45c', 'fishId': 'fish_45', 'latitude': 11.967300, 'longitude': 121.924700, 'region': 'Boracay, Aklan'},
+    {'locationId': 'location_46', 'fishId': 'fish_46', 'latitude': 9.850400, 'longitude': 118.728200, 'region': 'Puerto Princesa, Palawan'},
+    {'locationId': 'location_46b', 'fishId': 'fish_46', 'latitude': 10.196400, 'longitude': 123.761800, 'region': 'Camotes Sea'},
+    {'locationId': 'location_46c', 'fishId': 'location_46c', 'latitude': 11.200000, 'longitude': 125.005000, 'region': 'Southern Leyte Reefs'},
+    {'locationId': 'location_47', 'fishId': 'fish_47', 'latitude': 9.909900, 'longitude': 124.143500, 'region': 'Bohol Reefs'},
+    {'locationId': 'location_47b', 'fishId': 'fish_47', 'latitude': 11.566400, 'longitude': 122.513600, 'region': 'Panay Reefs'},
+    {'locationId': 'location_47c', 'fishId': 'fish_47', 'latitude': 5.978800, 'longitude': 126.024500, 'region': 'Davao Oriental Reefs'},
+    {'locationId': 'location_48', 'fishId': 'fish_48', 'latitude': 10.750200, 'longitude': 124.752100, 'region': 'Leyte Gulf'},
+    {'locationId': 'location_48b', 'fishId': 'fish_48', 'latitude': 11.589900, 'longitude': 125.006000, 'region': 'Samar Sea'},
+    {'locationId': 'location_48c', 'fishId': 'fish_48', 'latitude': 15.518200, 'longitude': 119.969200, 'region': 'West Philippine Sea off Zambales'},   
+    {'locationId': 'location_49', 'fishId': 'fish_49', 'latitude': 13.093300, 'longitude': 120.533300, 'region': 'Occidental Mindoro Shelf'},
+    {'locationId': 'location_49b', 'fishId': 'fish_49', 'latitude': 16.053300, 'longitude': 120.333300, 'region': 'Lingayen Gulf Offshore'},
+    {'locationId': 'location_49c', 'fishId': 'fish_49', 'latitude': 6.520000, 'longitude': 125.500000, 'region': 'Davao Gulf Slope'},
+    {'locationId': 'location_50', 'fishId': 'fish_50', 'latitude': 14.372700, 'longitude': 121.197800, 'region': 'Laguna de Bay River Mouths'},
+    {'locationId': 'location_50b', 'fishId': 'fish_50', 'latitude': 14.619400, 'longitude': 120.984200, 'region': 'Manila Bay Estuaries'},
+    {'locationId': 'location_50c', 'fishId': 'fish_50', 'latitude': 9.745700, 'longitude': 118.730200, 'region': 'Puerto Princesa Bay Mangroves'},       
+  ];
 
 
       for (var location in mapData) {

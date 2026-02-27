@@ -258,7 +258,7 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text(widget.fishName ?? 'Fish Species Map'),
         backgroundColor: Colors.blue,
-        // foregroundColor: Colors.white,
+        foregroundColor: Colors.white,
       ),
       body: FlutterMap(
         mapController: _mapController,

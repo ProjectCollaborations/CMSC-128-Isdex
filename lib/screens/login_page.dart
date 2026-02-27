@@ -4,7 +4,6 @@ import 'signup_page.dart';
 import '../services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -19,7 +18,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   Future<void> _handleLogin() async {
-    // Validate inputs
     if (_emailController.text.trim().isEmpty) {
       _showError('Please enter your email');
       return;
@@ -30,9 +28,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       await _authService.signInWithEmail(
@@ -40,7 +36,6 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text.trim(),
       );
 
-      // Success - navigate back to landing page
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -53,65 +48,60 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       _showError(_getErrorMessage(e.toString()));
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleForgotPassword() async {
-  final email = _emailController.text.trim().toLowerCase();
+    final email = _emailController.text.trim().toLowerCase();
 
-  if (email.isEmpty) {
-    _showError('Please enter your email address');
-    return;
-  }
-
-  final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-  if (!emailRegex.hasMatch(email)) {
-    _showError('Please enter a valid email address');
-    return;
-  }
-
-  setState(() => _isLoading = true);
-
-  try {
-    final exists = await _authService.isEmailRegisteredInAppDb(email);
-    if (!exists) {
-      _showError('No account found with this email.');
+    if (email.isEmpty) {
+      _showError('Please enter your email address');
       return;
     }
 
-    await _authService.resetPassword(email);
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+    if (!emailRegex.hasMatch(email)) {
+      _showError('Please enter a valid email address');
+      return;
+    }
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password reset email sent! Check your inbox.'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } on FirebaseAuthException catch (e) {
-    if (!mounted) return;
+    setState(() => _isLoading = true);
 
-    final msg = switch (e.code) {
-      'invalid-email' => 'Invalid email address',
-      'too-many-requests' => 'Too many attempts. Try again later.',
-      'network-request-failed' => 'Network error. Check your connection.',
-      _ => 'Failed to send reset email. Please try again.',
-    };
+    try {
+      final exists = await _authService.isEmailRegisteredInAppDb(email);
+      if (!exists) {
+        _showError('No account found with this email.');
+        return;
+      }
 
-    _showError(msg);
-  } catch (_) {
-    if (!mounted) return;
-    _showError('Failed to send reset email. Please try again.');
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
+      await _authService.resetPassword(email);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset email sent! Check your inbox.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      final msg = switch (e.code) {
+        'invalid-email' => 'Invalid email address',
+        'too-many-requests' => 'Too many attempts. Try again later.',
+        'network-request-failed' => 'Network error. Check your connection.',
+        _ => 'Failed to send reset email. Please try again.',
+      };
+
+      _showError(msg);
+    } catch (_) {
+      if (!mounted) return;
+      _showError('Failed to send reset email. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
-
 
   String _getErrorMessage(String error) {
     if (error.contains('user-not-found')) {
@@ -167,27 +157,40 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: kBackground,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                          child: Image.asset(
-                            'assets/images/isdex_logo.png',
-                            height: 40,
-                            width: 40,
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back, color: Colors.blue),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.blue[50],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'IsDex',
-                          style: TextStyle(
-                            color: kDarkNavy,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: kBackground,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: Image.asset(
+                                  'assets/images/isdex_logo.png',
+                                  height: 40,
+                                  width: 40,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'IsDex',
+                                style: TextStyle(
+                                  color: kDarkNavy,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
