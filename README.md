@@ -1,16 +1,17 @@
 # isdex
 
-A new Flutter project.
+## Logical View Diagram
+![System Architecture Diagram](system-architecture.png)
 
-## Getting Started
+## Flow Description
+**1. Auth Service** monitors the authentication state and checks log-in status of the User.
 
-This project is a starting point for a Flutter application.
+**2. Auth Service** concurrently **feeds log-in data** (such as the User UID and User Object) **directly to the Screens** to manage access control.
 
-A few resources to get you started if this is your first Flutter project:
+**3.** The **User** triggers an event by interacting with a specific Screen (e.g., adding a new fish sighting).
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+**4.** The **Screen directly updates the Firebase DB** by pushing new data to a specific node (e.g., user_sightings_temp).
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**5.** The **Firebase DB** utilizes a persistent connection to **feed real-time data** updates back to the **Screens**.
+
+**6.** The **Screen listens to this stream**, processes the raw data into **Marker** objects, and refreshes the map display for the user.
