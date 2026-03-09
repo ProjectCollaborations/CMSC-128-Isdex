@@ -302,116 +302,162 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     }
   }
 
-  Future<void> _showAddSightingDialog(LatLng latLng, User user) async {
-    String? selectedFishId;
-    String? selectedFishName;
-    final notesController = TextEditingController();
+Future<void> _showAddSightingDialog(LatLng latLng, User user) async {
+  String? selectedFishId;
+  String? selectedFishName;
+  final notesController = TextEditingController();
+  bool isAnonymous = false; // <-- new toggle
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('Add Sighting'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Show GPS was used — no raw coords for privacy
-                Row(
-                  children: [
-                    const Icon(Icons.my_location, size: 16, color: Colors.blue),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text(
-                        'Using your current GPS location',
-                        style: TextStyle(fontSize: 13, color: Colors.blue),
-                      ),
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setStateDialog) => AlertDialog(
+        title: const Text('Add Sighting'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // GPS indicator
+              Row(
+                children: [
+                  const Icon(Icons.my_location, size: 16, color: Colors.blue),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Using your current GPS location',
+                      style: TextStyle(fontSize: 13, color: Colors.blue),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Fish (common name)',
-                    style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 4),
-                DropdownButtonFormField<String>(
-                  value: selectedFishId,
-                  items: _fishList.map((f) => DropdownMenuItem<String>(
-                    value: f['fishId'] as String,
-                    child: Text(f['commonName'] as String),
-                  )).toList(),
-                  onChanged: (value) {
-                    setStateDialog(() {
-                      selectedFishId = value;
-                      selectedFishName = _fishList
-                          .firstWhere((f) => f['fishId'] == value)['commonName']
-                          .toString();
-                    });
-                  },
-                  decoration: const InputDecoration(
-                    hintText: 'Select fish',
-                    border: OutlineInputBorder(),
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Fish dropdown
+              const Text('Fish (common name)',
+                  style: TextStyle(fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              DropdownButtonFormField<String>(
+                value: selectedFishId,
+                items: _fishList.map((f) => DropdownMenuItem<String>(
+                  value: f['fishId'] as String,
+                  child: Text(f['commonName'] as String),
+                )).toList(),
+                onChanged: (value) {
+                  setStateDialog(() {
+                    selectedFishId = value;
+                    selectedFishName = _fishList
+                        .firstWhere((f) => f['fishId'] == value)['commonName']
+                        .toString();
+                  });
+                },
+                decoration: const InputDecoration(
+                  hintText: 'Select fish',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
-                    border: OutlineInputBorder(),
+              ),
+              const SizedBox(height: 12),
+
+              // Notes
+              TextField(
+                controller: notesController,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
+              // Anonymous toggle
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: SwitchListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: const Text(
+                    'Post anonymously',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
-                  maxLines: 3,
+                  subtitle: Text(
+                    isAnonymous
+                        ? 'Your name will not be shown'
+                        : 'Shown as: ${user.displayName?.isNotEmpty == true ? user.displayName! : user.email?.split('@')[0] ?? 'You'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isAnonymous ? Colors.orange[700] : Colors.grey[600],
+                    ),
+                  ),
+                  secondary: Icon(
+                    isAnonymous ? Icons.visibility_off : Icons.visibility,
+                    color: isAnonymous ? Colors.orange[700] : Colors.blue,
+                  ),
+                  value: isAnonymous,
+                  activeColor: Colors.orange[700],
+                  onChanged: (val) => setStateDialog(() => isAnonymous = val),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (selectedFishId == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select a fish first.')),
-                  );
-                  return;
-                }
-                Navigator.pop(context, true);
-              },
-              child: const Text('Save'),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (selectedFishId == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please select a fish first.')),
+                );
+                return;
+              }
+              Navigator.pop(context, true);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  if (confirmed != true || selectedFishId == null) return;
+
+  // Resolve display name based on toggle
+  final String displayName = isAnonymous
+      ? 'Anonymous'
+      : (user.displayName?.isNotEmpty == true
+          ? user.displayName!
+          : user.email?.split('@')[0] ?? 'Anonymous');
+
+  final sightingRef = _db.child('user_sightings_temp').push();
+  await sightingRef.set({
+    'userId': user.uid,
+    'displayName': displayName,
+    'isAnonymous': isAnonymous,
+    'fishId': selectedFishId,
+    'fishName': selectedFishName ?? 'Sighting',
+    'notes': notesController.text.trim(),
+    'latitude': latLng.latitude,
+    'longitude': latLng.longitude,
+    'createdAt': ServerValue.timestamp,
+  });
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isAnonymous
+            ? 'Sighting added anonymously!'
+            : 'Sighting added as $displayName!'),
       ),
     );
-
-    if (confirmed != true || selectedFishId == null) return;
-
-    // Use email prefix as display name (never expose UID publicly)
-    final displayName = user.displayName?.isNotEmpty == true
-        ? user.displayName!
-        : user.email?.split('@')[0] ?? 'Anonymous';
-
-    final sightingRef = _db.child('user_sightings_temp').push();
-    await sightingRef.set({
-      'userId': user.uid,           // kept for owner checks, not shown publicly
-      'displayName': displayName,   // shown publicly instead of UID
-      'fishId': selectedFishId,
-      'fishName': selectedFishName ?? 'Sighting',
-      'notes': notesController.text.trim(),
-      'latitude': latLng.latitude,
-      'longitude': latLng.longitude,
-      'createdAt': ServerValue.timestamp,
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sighting added!')),
-      );
-    }
   }
+}
 
   @override
   Widget build(BuildContext context) {
