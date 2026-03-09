@@ -18,6 +18,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   final MapController _mapController = MapController();
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   final List<Marker> _markers = [];
+  LatLng? _userLocation;
 
   List<Map<String, dynamic>> _fishList = [];
   bool _fishLoaded = false;
@@ -28,6 +29,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     super.initState();
     _loadFishList();
     _listenToUserSightings();
+    _getUserLocationOnStartup();
   }
 
   Future<void> _loadFishList() async {
@@ -50,6 +52,42 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     list.sort((a, b) => a['commonName'].toString().compareTo(b['commonName'].toString()));
     setState(() { _fishList = list; _fishLoaded = true; });
   }
+
+  Future<void> _getUserLocationOnStartup() async {
+  try {
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    final Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    final LatLng latLng = LatLng(position.latitude, position.longitude);
+
+    if (!mounted) return;
+
+    setState(() {
+      _userLocation = latLng;
+    });
+
+    // Fly map to user
+    _mapController.move(latLng, 14);
+
+  } catch (e) {
+    debugPrint("Location error: $e");
+  }
+}
 
   void _listenToUserSightings() {
     _db.child('user_sightings_temp').onValue.listen((event) {
@@ -284,6 +322,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       );
 
       final LatLng latLng = LatLng(position.latitude, position.longitude);
+      
+      setState(() {
+        _userLocation = latLng;
+      });
 
       // 3. Fly map to user location
       _mapController.move(latLng, 14.0);
@@ -483,6 +525,21 @@ Future<void> _showAddSightingDialog(LatLng latLng, User user) async {
             urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
             userAgentPackageName: 'com.example.isdex',
           ),
+           if (_userLocation != null)
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: _userLocation!,
+                  width: 60,
+                  height: 60,
+                  child: const Icon(
+                    Icons.my_location,
+                    color: Colors.blue,
+                    size: 38,
+                  ),
+                ),
+              ],
+            ),
           MarkerLayer(markers: _markers),
         ],
       ),
