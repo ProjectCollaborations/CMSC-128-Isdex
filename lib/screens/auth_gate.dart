@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'landing_page.dart';
 import 'login_page.dart';
 import '../services/auth_service.dart';
-// import 'admin_dashboard_page.dart'; // We will uncomment this in the next phase
+import 'admin_dashboard_page.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -45,28 +45,8 @@ class _AuthGateState extends State<AuthGate> {
 
             // 4. Route Admins and Mods to the Web Dashboard
             if (role == 'admin' || role == 'mod') {
-              // return const AdminDashboardPage(); // UNCOMMENT WHEN CREATED
-              
-              // Temporary placeholder until we build the real dashboard
-              return Scaffold(
-                appBar: AppBar(
-                  title: const Text('Admin Portal'),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.logout),
-                      onPressed: () => _authService.signOut(),
-                    )
-                  ],
-                ),
-                body: Center(
-                  child: Text(
-                    'Welcome to the Web Dashboard!\nYour role is: $role', 
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                ),
-              ); 
-            }
+              return const AdminDashboardPage();
+            } // <-- THIS WAS THE MISSING BRACE!
 
             // 5. Route standard users to the normal app
             return const LandingPage();
