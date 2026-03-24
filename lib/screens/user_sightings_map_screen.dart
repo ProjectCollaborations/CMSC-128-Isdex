@@ -257,6 +257,28 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                                     label: const Text('Delete this pin',
                                         style: TextStyle(color: Colors.red, fontSize: 14)),
                                   ),
+                                )
+                              else if (status == 'approved') // Only show on public pins
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+                                      // Flag the sighting in the database
+                                      await _db.child('user_sightings_temp').child(key.toString()).update({'isReported': true});
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Sighting reported to moderators.'),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.flag, color: Colors.orange, size: 22),
+                                    label: const Text('Report inaccurate pin',
+                                        style: TextStyle(color: Colors.orange, fontSize: 14)),
+                                  ),
                                 ),
                             ],
                           ),
@@ -510,7 +532,8 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       'latitude': latLng.latitude,
       'longitude': latLng.longitude,
       'createdAt': ServerValue.timestamp,
-      'status': 'pending', // <-- ADDED THIS LINE
+      'status': 'pending', 
+      'isReported': false, // Ensure new pins start clean
     });
 
     if (mounted) {

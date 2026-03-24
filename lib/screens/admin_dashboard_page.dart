@@ -55,7 +55,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   // ==========================================
-  // PHASE 3: SIGHTINGS QUEUE LOGIC
+  // PHASE 3 & 5: SIGHTINGS QUEUE LOGIC
   // ==========================================
   void _listenToPendingSightings() {
     _db.child('user_sightings_temp').onValue.listen((event) {
@@ -65,13 +65,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         
         data.forEach((key, value) {
           final m = value as Map<dynamic, dynamic>;
-          if (m['status'] == 'pending') {
+          // FIX: Check for BOTH pending status OR reported flag
+          if (m['status'] == 'pending' || m['isReported'] == true) {
             pending.add({
               'id': key.toString(),
               'fishName': m['fishName']?.toString() ?? 'Unknown Fish',
               'displayName': m['displayName']?.toString() ?? 'Anonymous',
               'notes': m['notes']?.toString() ?? 'No notes provided.',
               'timestamp': m['createdAt'] ?? 0,
+              'isReported': m['isReported'] == true, // Track report status
             });
           }
         });
@@ -104,6 +106,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       final Map<String, dynamic> updates = {};
       for (String id in _selectedIds) {
         updates['user_sightings_temp/$id/status'] = newStatus;
+        
+        // FIX: If moderator approves a reported pin, clear the report flag
+        if (newStatus == 'approved') {
+          updates['user_sightings_temp/$id/isReported'] = false;
+        }
       }
       await _db.update(updates);
 
@@ -309,7 +316,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         },
                         cells: [
                           DataCell(Text(sighting['displayName'])),
-                          DataCell(Text(sighting['fishName'])),
+                          // FIX: Display orange flag if this pin was reported
+                          DataCell(
+                            Row(
+                              children: [
+                                Text(sighting['fishName']),
+                                if (sighting['isReported'] == true) ...[
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.flag, color: Colors.orange, size: 16),
+                                ]
+                              ],
+                            ),
+                          ),
                           DataCell(
                             SizedBox(
                               width: 300,
