@@ -1,4 +1,7 @@
 // lib/screens/admin_dashboard_page.dart
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../services/auth_service.dart';
@@ -16,12 +19,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   
   // State variables
   String _currentUserRole = 'mod'; // Default fallback
-  int _currentTabIndex = 0; // 0 = Sightings, 1 = Users
+  int _currentTabIndex = 0; // 0 = Sightings, 1 = Reports, 2 = Users
   bool _isLoading = true;
   bool _isProcessing = false;
 
   // Data lists
   List<Map<String, dynamic>> _pendingSightings = [];
+  List<Map<String, dynamic>> _reportedPosts = [];
   List<Map<String, dynamic>> _usersList = [];
   final Set<String> _selectedIds = {};
 
@@ -39,14 +43,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         setState(() => _currentUserRole = role ?? 'mod');
       }
       
-      // If Admin, also fetch the user list
+      // Admin only data
       if (_currentUserRole == 'admin') {
         _listenToUsers();
       }
     }
     
-    // Everyone here (Admin & Mod) needs the sightings list
+    // Data needed by both Admins and Mods
     _listenToPendingSightings();
+    _listenToReportedPosts();
   }
 
   // ==========================================
@@ -123,6 +128,67 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   // ==========================================
+  // PHASE 5: REPORTED COMMUNITY POSTS LOGIC
+  // ==========================================
+  void _listenToReportedPosts() {
+    _db.child('community_posts').onValue.listen((event) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final data = event.snapshot.value as Map<dynamic, dynamic>;
+        final List<Map<String, dynamic>> reported = [];
+
+        data.forEach((key, value) {
+          final m = value as Map<dynamic, dynamic>;
+          // Only show posts that are reported AND not already archived
+          if (m['isReported'] == true && m['status'] != 'archived') {
+            reported.add({
+              'id': key.toString(),
+              'username': m['username']?.toString() ?? 'Unknown',
+              'caption': m['caption']?.toString() ?? 'No caption',
+              'imageBase64': m['imageBase64']?.toString() ?? '',
+              'timestamp': m['timePosted'] ?? 0,
+            });
+          }
+        });
+
+        reported.sort((a, b) => (b['timestamp'] as int).compareTo(a['timestamp'] as int));
+
+        if (mounted) {
+          setState(() => _reportedPosts = reported);
+        }
+      } else {
+        if (mounted) setState(() => _reportedPosts = []);
+      }
+    });
+  }
+
+  Future<void> _handleReportedPost(String postId, String action) async {
+    try {
+      if (action == 'archive') {
+        // Hide from feed, unflag as reported
+        await _db.child('community_posts/$postId').update({'status': 'archived', 'isReported': false});
+      } else if (action == 'dismiss') {
+        // Keep on feed, just remove the reported flag
+        await _db.child('community_posts/$postId').update({'isReported': false});
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(action == 'archive' ? 'Post archived and hidden.' : 'Report dismissed.'),
+            backgroundColor: action == 'archive' ? Colors.red : Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error processing post: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // ==========================================
   // PHASE 4: ADMIN USER MANAGEMENT LOGIC
   // ==========================================
   void _listenToUsers() {
@@ -141,7 +207,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           });
         });
 
-        // Sort admins first, then mods, then users
         users.sort((a, b) => a['role'].compareTo(b['role']));
 
         if (mounted) {
@@ -176,7 +241,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Action Bar
         Container(
           padding: const EdgeInsets.all(16.0),
           color: Colors.blue[50],
@@ -214,8 +278,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ],
           ),
         ),
-
-        // Data Table
         Expanded(
           child: _pendingSightings.isEmpty
             ? const Center(
@@ -259,6 +321,91 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     }).toList(),
                   ),
                 ),
+              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportedPostsQueue() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.orange[50],
+          child: Text(
+            'Reported Posts Awaiting Review: ${_reportedPosts.length}',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange[900]),
+          ),
+        ),
+        Expanded(
+          child: _reportedPosts.isEmpty
+            ? const Center(
+                child: Text('No reported posts! Community is behaving.', style: TextStyle(fontSize: 18, color: Colors.grey)),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _reportedPosts.length,
+                itemBuilder: (context, index) {
+                  final post = _reportedPosts[index];
+                  Uint8List? imageBytes = post['imageBase64'].isNotEmpty 
+                      ? base64Decode(post['imageBase64']) 
+                      : null;
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.orange, width: 1)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Show the offensive image
+                          if (imageBytes != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.memory(imageBytes, width: 120, height: 120, fit: BoxFit.cover),
+                            )
+                          else
+                            Container(width: 120, height: 120, color: Colors.grey[200], child: const Icon(Icons.image_not_supported)),
+                          
+                          const SizedBox(width: 16),
+                          
+                          // Post Details & Actions
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Posted by: ${post['username']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                const SizedBox(height: 8),
+                                Text(post['caption'], maxLines: 3, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () => _handleReportedPost(post['id'], 'dismiss'),
+                                      icon: const Icon(Icons.thumb_up_alt_outlined, color: Colors.green),
+                                      label: const Text('Dismiss Report', style: TextStyle(color: Colors.green)),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _handleReportedPost(post['id'], 'archive'),
+                                      icon: const Icon(Icons.gavel),
+                                      label: const Text('Archive Post'),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
         ),
       ],
@@ -346,11 +493,35 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  // Determine which view to render based on the selected tab
+  Widget _buildBody() {
+    if (_currentTabIndex == 0) return _buildSightingsQueue();
+    if (_currentTabIndex == 1) return _buildReportedPostsQueue();
+    if (_currentTabIndex == 2 && _currentUserRole == 'admin') return _buildUserManagement();
+    return const Center(child: Text('Unauthorized access'));
+  }
+
+  // Dynamic tabs based on role
+  List<BottomNavigationBarItem> get _navItems {
+    List<BottomNavigationBarItem> items = [
+      const BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Sightings'),
+      const BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'Reports'),
+    ];
+    if (_currentUserRole == 'admin') {
+      items.add(const BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'));
+    }
+    return items;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentTabIndex == 0 ? 'Moderator Dashboard' : 'User Management'),
+        title: Text(
+          _currentTabIndex == 0 ? 'Sightings Queue' 
+          : _currentTabIndex == 1 ? 'Reported Posts' 
+          : 'User Management'
+        ),
         backgroundColor: Colors.blue[900],
         foregroundColor: Colors.white,
         actions: [
@@ -363,26 +534,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
-        : (_currentTabIndex == 0 ? _buildSightingsQueue() : _buildUserManagement()),
-        
-      // Only show the Bottom Nav Bar if the user is an Admin
-      bottomNavigationBar: _currentUserRole == 'admin' 
-        ? BottomNavigationBar(
-            currentIndex: _currentTabIndex,
-            onTap: (index) => setState(() => _currentTabIndex = index),
-            selectedItemColor: Colors.blue[900],
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.map),
-                label: 'Sightings Queue',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.people),
-                label: 'User Management',
-              ),
-            ],
-          )
-        : null, // Mods don't get the navigation bar at all
+        : _buildBody(),
+      
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentTabIndex,
+        onTap: (index) => setState(() => _currentTabIndex = index),
+        selectedItemColor: Colors.blue[900],
+        items: _navItems,
+      ),
     );
   }
 }
