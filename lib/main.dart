@@ -4,6 +4,7 @@ import 'firebase_options.dart';
 import 'services/database_init_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'screens/auth_gate.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,9 +13,10 @@ void main() async {
   );
 
   // Enable offline disk persistence for Realtime Database
+  if(!kIsWeb) {
   FirebaseDatabase.instance.setPersistenceEnabled(true);
   FirebaseDatabase.instance.setPersistenceCacheSizeBytes(10 * 1024 * 1024);
-
+  }
   // await DatabaseInitService().initializeAllData();
 
   runApp(const MyApp());
