@@ -1,3 +1,4 @@
+// lib/screens/community_page.dart
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -57,10 +58,19 @@ class _FeedList extends StatelessWidget {
         }
 
         final raw = snapshot.data!.snapshot.value as Map;
-        final entries = raw.entries.toList()
+        
+        // MODERATION: Filter out posts that have been archived by admins
+        final entries = raw.entries.where((e) {
+          final data = e.value as Map;
+          return data['status'] != 'archived'; 
+        }).toList()
           ..sort((a, b) =>
               (b.value['timePosted'] ?? 0)
                   .compareTo(a.value['timePosted'] ?? 0));
+
+        if (entries.isEmpty) {
+          return const Center(child: Text('No active posts found.'));
+        }
 
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 80),
@@ -179,7 +189,9 @@ class _PostItem extends StatelessWidget {
                 },
               ),
               const Spacer(),
-              if (user != null && user.uid == ownerUid)
+              
+              // MODERATION: Show options menu to all logged-in users
+              if (user != null)
                 IconButton(
                   icon: const Icon(Icons.more_horiz),
                   onPressed: () {
@@ -190,19 +202,50 @@ class _PostItem extends StatelessWidget {
                       ),
                       builder: (context) => SafeArea(
                         minimum: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: const Icon(Icons.delete, color: Colors.red),
-                          title: const Text('Delete post'),
-                          onTap: () async {
-                            Navigator.pop(context);
-                            final db = FirebaseDatabase.instance.ref();
-                            await db.child('community_posts/$postId').remove();
-                            await db.child('post_likes/$postId').remove();
-                            await db.child('post_comments/$postId').remove();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Post deleted')),
-                            );
-                          },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Option 1: Delete (Only for the owner)
+                            if (user.uid == ownerUid)
+                              ListTile(
+                                leading: const Icon(Icons.delete, color: Colors.red),
+                                title: const Text('Delete post'),
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  final db = FirebaseDatabase.instance.ref();
+                                  await db.child('community_posts/$postId').remove();
+                                  await db.child('post_likes/$postId').remove();
+                                  await db.child('post_comments/$postId').remove();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Post deleted')),
+                                    );
+                                  }
+                                },
+                              )
+                            // Option 2: Report (For everyone else)
+                            else
+                              ListTile(
+                                leading: const Icon(Icons.flag, color: Colors.orange),
+                                title: const Text('Report inappropriate post'),
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  // Flag the post for moderators
+                                  await FirebaseDatabase.instance
+                                      .ref('community_posts/$postId')
+                                      .update({'isReported': true});
+                                  
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Post reported to moderators.'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                          ],
                         ),
                       ),
                     );
@@ -319,9 +362,12 @@ void _openCreatePostSheet(BuildContext context) {
                       'imageBase64': base64Image,
                       'likes': 0,
                       'timePosted': ServerValue.timestamp,
+                      // MODERATION: Default states for new posts
+                      'status': 'active',
+                      'isReported': false,
                     });
 
-                    Navigator.pop(context);
+                    if (context.mounted) Navigator.pop(context);
                   },
                   child: const Text('Post'),
                 ),
