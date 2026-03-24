@@ -54,40 +54,40 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   }
 
   Future<void> _getUserLocationOnStartup() async {
-  try {
-    LocationPermission permission = await Geolocator.checkPermission();
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
 
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      final Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      final LatLng latLng = LatLng(position.latitude, position.longitude);
+
+      if (!mounted) return;
+
+      setState(() {
+        _userLocation = latLng;
+      });
+
+      // Fly map to user
+      _mapController.move(latLng, 14);
+
+    } catch (e) {
+      debugPrint("Location error: $e");
     }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    final Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    final LatLng latLng = LatLng(position.latitude, position.longitude);
-
-    if (!mounted) return;
-
-    setState(() {
-      _userLocation = latLng;
-    });
-
-    // Fly map to user
-    _mapController.move(latLng, 14);
-
-  } catch (e) {
-    debugPrint("Location error: $e");
   }
-}
 
   void _listenToUserSightings() {
     _db.child('user_sightings_temp').onValue.listen((event) {
@@ -106,8 +106,19 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
           final fishId = (m['fishId'] ?? '').toString();
           final ownerId = (m['userId'] ?? '').toString();
           final displayName = (m['displayName'] ?? 'Anonymous').toString();
+          final status = (m['status'] ?? 'pending').toString(); // Default to pending
+          
           final currentUser = FirebaseAuth.instance.currentUser;
           final isOwner = currentUser != null && currentUser.uid == ownerId;
+
+          // MODERATION FILTER: 
+          // If it is NOT approved, and the current user is NOT the owner, hide it.
+          if (status != 'approved' && !isOwner) {
+            return; 
+          }
+
+          // UX: Pending pins are orange, approved are red.
+          final pinColor = status == 'pending' ? Colors.orange : Colors.red;
 
           markers.add(
             Marker(
@@ -128,8 +139,15 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
                           Text(
-                            'User-submitted sighting. May not be scientifically verified.',
-                            style: TextStyle(fontSize: 13, color: Colors.grey[700], fontStyle: FontStyle.italic),
+                            status == 'pending' 
+                                ? 'Status: Pending Moderator Approval' 
+                                : 'User-submitted sighting. May not be scientifically verified.',
+                            style: TextStyle(
+                              fontSize: 13, 
+                              color: status == 'pending' ? Colors.orange[700] : Colors.grey[700], 
+                              fontStyle: FontStyle.italic,
+                              fontWeight: status == 'pending' ? FontWeight.bold : FontWeight.normal,
+                            ),
                           ),
                         ],
                       ),
@@ -249,9 +267,13 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                 },
                 child: Column(
                   children: [
-                    const Icon(Icons.location_on, color: Colors.red, size: 40),
+                    Icon(Icons.location_on, color: pinColor, size: 40),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white70,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                       child: Text(
                         fishName,
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
@@ -344,162 +366,166 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     }
   }
 
-Future<void> _showAddSightingDialog(LatLng latLng, User user) async {
-  String? selectedFishId;
-  String? selectedFishName;
-  final notesController = TextEditingController();
-  bool isAnonymous = false; // <-- new toggle
+  Future<void> _showAddSightingDialog(LatLng latLng, User user) async {
+    String? selectedFishId;
+    String? selectedFishName;
+    final notesController = TextEditingController();
+    bool isAnonymous = false; // <-- new toggle
 
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setStateDialog) => AlertDialog(
-        title: const Text('Add Sighting'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // GPS indicator
-              Row(
-                children: [
-                  const Icon(Icons.my_location, size: 16, color: Colors.blue),
-                  const SizedBox(width: 6),
-                  const Expanded(
-                    child: Text(
-                      'Using your current GPS location',
-                      style: TextStyle(fontSize: 13, color: Colors.blue),
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('Add Sighting'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // GPS indicator
+                Row(
+                  children: [
+                    const Icon(Icons.my_location, size: 16, color: Colors.blue),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'Using your current GPS location',
+                        style: TextStyle(fontSize: 13, color: Colors.blue),
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Fish dropdown
+                const Text('Fish (common name)',
+                    style: TextStyle(fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<String>(
+                  value: selectedFishId,
+                  items: _fishList.map((f) => DropdownMenuItem<String>(
+                    value: f['fishId'] as String,
+                    child: Text(f['commonName'] as String),
+                  )).toList(),
+                  onChanged: (value) {
+                    setStateDialog(() {
+                      selectedFishId = value;
+                      selectedFishName = _fishList
+                          .firstWhere((f) => f['fishId'] == value)['commonName']
+                          .toString();
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Select fish',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Fish dropdown
-              const Text('Fish (common name)',
-                  style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(height: 4),
-              DropdownButtonFormField<String>(
-                value: selectedFishId,
-                items: _fishList.map((f) => DropdownMenuItem<String>(
-                  value: f['fishId'] as String,
-                  child: Text(f['commonName'] as String),
-                )).toList(),
-                onChanged: (value) {
-                  setStateDialog(() {
-                    selectedFishId = value;
-                    selectedFishName = _fishList
-                        .firstWhere((f) => f['fishId'] == value)['commonName']
-                        .toString();
-                  });
-                },
-                decoration: const InputDecoration(
-                  hintText: 'Select fish',
-                  border: OutlineInputBorder(),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              // Notes
-              TextField(
-                controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-
-              // Anonymous toggle
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: SwitchListTile(
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  title: const Text(
-                    'Post anonymously',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                // Notes
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    border: OutlineInputBorder(),
                   ),
-                  subtitle: Text(
-                    isAnonymous
-                        ? 'Your name will not be shown'
-                        : 'Shown as: ${user.displayName?.isNotEmpty == true ? user.displayName! : user.email?.split('@')[0] ?? 'You'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isAnonymous ? Colors.orange[700] : Colors.grey[600],
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+
+                // Anonymous toggle
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: SwitchListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    title: const Text(
+                      'Post anonymously',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                     ),
+                    subtitle: Text(
+                      isAnonymous
+                          ? 'Your name will not be shown'
+                          : 'Shown as: ${user.displayName?.isNotEmpty == true ? user.displayName! : user.email?.split('@')[0] ?? 'You'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isAnonymous ? Colors.orange[700] : Colors.grey[600],
+                      ),
+                    ),
+                    secondary: Icon(
+                      isAnonymous ? Icons.visibility_off : Icons.visibility,
+                      color: isAnonymous ? Colors.orange[700] : Colors.blue,
+                    ),
+                    value: isAnonymous,
+                    activeColor: Colors.orange[700],
+                    onChanged: (val) => setStateDialog(() => isAnonymous = val),
                   ),
-                  secondary: Icon(
-                    isAnonymous ? Icons.visibility_off : Icons.visibility,
-                    color: isAnonymous ? Colors.orange[700] : Colors.blue,
-                  ),
-                  value: isAnonymous,
-                  activeColor: Colors.orange[700],
-                  onChanged: (val) => setStateDialog(() => isAnonymous = val),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (selectedFishId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select a fish first.')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (selectedFishId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please select a fish first.')),
-                );
-                return;
-              }
-              Navigator.pop(context, true);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  if (confirmed != true || selectedFishId == null) return;
-
-  // Resolve display name based on toggle
-  final String displayName = isAnonymous
-      ? 'Anonymous'
-      : (user.displayName?.isNotEmpty == true
-          ? user.displayName!
-          : user.email?.split('@')[0] ?? 'Anonymous');
-
-  final sightingRef = _db.child('user_sightings_temp').push();
-  await sightingRef.set({
-    'userId': user.uid,
-    'displayName': displayName,
-    'isAnonymous': isAnonymous,
-    'fishId': selectedFishId,
-    'fishName': selectedFishName ?? 'Sighting',
-    'notes': notesController.text.trim(),
-    'latitude': latLng.latitude,
-    'longitude': latLng.longitude,
-    'createdAt': ServerValue.timestamp,
-  });
-
-  if (mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isAnonymous
-            ? 'Sighting added anonymously!'
-            : 'Sighting added as $displayName!'),
       ),
     );
+
+    if (confirmed != true || selectedFishId == null) return;
+
+    // Resolve display name based on toggle
+    final String displayName = isAnonymous
+        ? 'Anonymous'
+        : (user.displayName?.isNotEmpty == true
+            ? user.displayName!
+            : user.email?.split('@')[0] ?? 'Anonymous');
+
+    final sightingRef = _db.child('user_sightings_temp').push();
+    await sightingRef.set({
+      'userId': user.uid,
+      'displayName': displayName,
+      'isAnonymous': isAnonymous,
+      'fishId': selectedFishId,
+      'fishName': selectedFishName ?? 'Sighting',
+      'notes': notesController.text.trim(),
+      'latitude': latLng.latitude,
+      'longitude': latLng.longitude,
+      'createdAt': ServerValue.timestamp,
+      'status': 'pending', // <-- ADDED THIS LINE
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAnonymous
+              ? 'Anonymous sighting submitted! Awaiting moderator approval.'
+              : 'Sighting submitted as $displayName! Awaiting moderator approval.',
+          ),
+          duration: const Duration(seconds: 4), // Give them time to read it
+        ),
+      );
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {

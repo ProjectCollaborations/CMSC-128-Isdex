@@ -85,4 +85,18 @@ class AuthService {
       rethrow;
     }
   }
+
+  // Fetch user role from Realtime Database
+  Future<String?> getUserRole(String uid) async {
+    try {
+      final snap = await _db.child('users').child(uid).child('role').get();
+      if (snap.exists && snap.value != null) {
+        return snap.value.toString();
+      }
+      return 'user'; // Default fallback if no role is found
+    } catch (e) {
+      print('Error getting role: $e');
+      return 'user';
+    }
+  }
 }
