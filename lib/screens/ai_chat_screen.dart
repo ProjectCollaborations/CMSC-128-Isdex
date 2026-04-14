@@ -135,7 +135,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         }
       }
 
-      // 4. Initialize Gemini Model with Security Enhancements
+      // Initialize Gemini Model with Security Enhancements
       final model = GenerativeModel(
         model: 'gemini-3.1-flash-lite-preview',
         apiKey: apiKey,
