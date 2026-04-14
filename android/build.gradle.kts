@@ -15,6 +15,11 @@ allprojects {
     }
 }
 
+// Some Flutter plugins (including geolocator variants) still read SDK values from root extra properties.
+extra["compileSdkVersion"] = 35
+extra["targetSdkVersion"] = 35
+extra["minSdkVersion"] = 23
+
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")
