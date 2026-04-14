@@ -1,1 +1,21 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"isdex-68054","appId":"1:429295762575:android:703be69a0c44c850dcc4fa","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"isdex-68054","configurations":{"android":"1:429295762575:android:703be69a0c44c850dcc4fa"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "isdex-68054",
+          "appId": "1:429295762575:android:703be69a0c44c850dcc4fa",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "isdex-68054",
+          "configurations": {
+            "android": "1:429295762575:android:703be69a0c44c850dcc4fa"
+          }
+        }
+      }
+    }
+  }
+}

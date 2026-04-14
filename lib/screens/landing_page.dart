@@ -6,6 +6,7 @@ import 'fish_detail_page.dart';
 import 'login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_sightings_map_screen.dart';
+import 'ai_chat_screen.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -448,6 +449,25 @@ void _showFishDetails(Map<dynamic, dynamic> fish) {
                         ),
                         tooltip: isLoggedIn ? 'User sightings (add & view)' : 'User sightings (view only)',
                       ),
+
+                      // AI Assistant Button (Only for logged-in users)
+                      if (isLoggedIn)
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AiChatScreen(),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.auto_awesome,
+                            color: Colors.grey[400],
+                            size: 28,
+                          ),
+                          tooltip: 'AI Assistant',
+                        ),
                     ],
                   );
                 },

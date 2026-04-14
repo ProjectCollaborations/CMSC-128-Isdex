@@ -79,6 +79,7 @@ google-services.json
 GoogleService-Info.plist
 
 # ── Misc / OS ─────────────────────────────────────────────────────
+.env
 *.DS_Store
 Thumbs.db
 *.log

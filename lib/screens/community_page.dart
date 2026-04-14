@@ -352,7 +352,9 @@ void _openCreatePostSheet(BuildContext context) {
                 ElevatedButton(
                   onPressed: () async {
                     if (base64Image == null ||
-                        captionController.text.trim().isEmpty) return;
+                        captionController.text.trim().isEmpty) {
+                      return;
+                    }
 
                     await ref.push().set({
                       'uid': user!.uid,

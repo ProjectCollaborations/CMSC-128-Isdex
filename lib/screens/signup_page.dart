@@ -286,7 +286,6 @@ class _FormField extends StatelessWidget {
     this.obscure = false,
     this.keyboardType = TextInputType.text,
     this.controller,
-    super.key,
   });
 
   @override
