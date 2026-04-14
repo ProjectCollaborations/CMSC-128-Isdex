@@ -21,6 +21,46 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
   bool _isAITyping = false;
 
+  Future<void> _clearChat() async {
+    if (_userId.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Chat History?'),
+        content: const Text('This will permanently delete all messages in this conversation.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _db.child('chat_sessions/$_userId').remove();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Chat history cleared')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to clear chat: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     // Prevent sending while AI is already typing
@@ -83,12 +123,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
       // Filter out the current message to avoid duplication in history
       final filteredHistory = historyList.where((e) => e.key != newMessageRef.key).toList();
 
-      final contentHistory = filteredHistory.map((m) {
-        final role = m.value['role'] == 'user' ? 'user' : 'model';
-        return Content(role, [TextPart(m.value['content'])]);
-      }).toList();
+      final List<Content> contentHistory = [];
+      String? lastRole;
 
-      // Initialize Gemini Model
+      for (var m in filteredHistory) {
+        final role = m.value['role'] == 'user' ? 'user' : 'model';
+        // Only add if it alternates roles, to prevent Gemini API crashes
+        if (role != lastRole) {
+          contentHistory.add(Content(role, [TextPart(m.value['content'])]));
+          lastRole = role;
+        }
+      }
+
+      // 4. Initialize Gemini Model with Security Enhancements
       final model = GenerativeModel(
         model: 'gemini-3.1-flash-lite-preview',
         apiKey: apiKey,
@@ -123,7 +170,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     } catch (e) {
       if (mounted) {
-        String errorMsg = 'An error occurred. Please try again.';
+        String errorMsg = 'Error: ${e.toString()}';
         if (e.toString().contains('safety')) {
           errorMsg = 'The message was blocked by safety filters.';
         }
@@ -132,6 +179,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           SnackBar(
             content: Text(errorMsg),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
           ),
         );
       }
@@ -163,6 +211,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
         backgroundColor: kDarkNavy,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _isAITyping ? null : _clearChat,
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clear chat',
+          ),
+        ],
       ),
       body: Column(
         children: [
