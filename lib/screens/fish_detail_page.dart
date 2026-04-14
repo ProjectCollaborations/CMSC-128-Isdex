@@ -196,7 +196,7 @@ class FishDetailPage extends StatelessWidget {
                             ],
                           ),
                         );
-                      }).toList()
+                      })
                     else
                       Text(
                         'No identifying features listed',

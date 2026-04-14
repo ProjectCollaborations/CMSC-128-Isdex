@@ -424,7 +424,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     style: TextStyle(fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
                 DropdownButtonFormField<String>(
-                  value: selectedFishId,
+                  initialValue: selectedFishId,
                   items: _fishList.map((f) => DropdownMenuItem<String>(
                     value: f['fishId'] as String,
                     child: Text(f['commonName'] as String),
@@ -483,7 +483,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                       color: isAnonymous ? Colors.orange[700] : Colors.blue,
                     ),
                     value: isAnonymous,
-                    activeColor: Colors.orange[700],
+                    activeThumbColor: Colors.orange[700],
                     onChanged: (val) => setStateDialog(() => isAnonymous = val),
                   ),
                 ),

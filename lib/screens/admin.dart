@@ -151,7 +151,7 @@ class _AdminPanelState extends State<AdminPanel>
             entries.add(
               SightingEntry.fromSnapshot(
                 key.toString(),
-                value as Map<dynamic, dynamic>,
+                value,
               ),
             );
           }
