@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -23,6 +26,124 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   List<Map<String, dynamic>> _fishList = [];
   bool _fishLoaded = false;
   bool _isLocating = false;
+
+  Future<Map<String, String>> _validateSightingLocation(LatLng latLng) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latLng.latitude}&lon=${latLng.longitude}&zoom=18&addressdetails=1',
+      );
+
+      final req = await client.getUrl(uri);
+      req.headers.set('User-Agent', 'isdex-app/1.0 (sighting-validation)');
+      final res = await req.close();
+
+      if (res.statusCode != 200) {
+        return {
+          'status': 'unknown',
+          'message': 'Location check unavailable (HTTP ${res.statusCode})',
+        };
+      }
+
+      final body = await utf8.decoder.bind(res).join();
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) {
+        return {'status': 'unknown', 'message': 'Location check unavailable'};
+      }
+
+      final address = decoded['address'];
+      final displayName = (decoded['display_name'] ?? '').toString().toLowerCase();
+      final topType = (decoded['type'] ?? '').toString().toLowerCase();
+      final topCategory = (decoded['category'] ?? '').toString().toLowerCase();
+
+      if (address is! Map) {
+        return {
+          'status': 'unknown',
+          'message': displayName.isNotEmpty
+              ? 'Location check uncertain: ${decoded['display_name']}'
+              : 'Location check uncertain',
+        };
+      }
+
+      final addr = Map<String, dynamic>.from(address);
+
+      bool hasAny(List<String> keys) => keys.any((k) {
+            final v = addr[k];
+            return v != null && v.toString().trim().isNotEmpty;
+          });
+
+      final hasLandSignals = hasAny([
+        'road',
+        'house_number',
+        'suburb',
+        'neighbourhood',
+        'city',
+        'town',
+        'village',
+        'municipality',
+        'county',
+        'state',
+        'postcode',
+      ]);
+
+      final hasWaterSignals = hasAny([
+        'ocean',
+        'sea',
+        'water',
+        'waterway',
+        'bay',
+        'strait',
+        'river',
+        'lake',
+      ]);
+
+      final isTopLevelWater = topCategory == 'natural' &&
+          [
+            'water',
+            'bay',
+            'strait',
+            'coastline',
+            'river',
+            'riverbank',
+            'reef',
+          ].contains(topType);
+
+      if (isTopLevelWater) {
+        return {
+          'status': 'water',
+          'message': 'Detected on water (${decoded['display_name'] ?? 'unknown area'})',
+        };
+      }
+
+      if (hasLandSignals) {
+        return {
+          'status': 'land',
+          'message': 'Detected on land (${decoded['display_name'] ?? 'unknown area'})',
+        };
+      }
+
+      if (hasWaterSignals) {
+        return {
+          'status': 'water',
+          'message': 'Detected on water (${decoded['display_name'] ?? 'unknown area'})',
+        };
+      }
+
+      return {
+        'status': 'unknown',
+        'message': displayName.isNotEmpty
+            ? 'Location check uncertain: ${decoded['display_name']}'
+            : 'Location check uncertain',
+      };
+    } catch (e) {
+      return {
+        'status': 'unknown',
+        'message': 'Location check failed: $e',
+      };
+    } finally {
+      client.close(force: true);
+    }
+  }
 
   @override
   void initState() {
@@ -532,8 +653,24 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       'latitude': latLng.latitude,
       'longitude': latLng.longitude,
       'createdAt': ServerValue.timestamp,
-      'status': 'pending', 
+      'status': 'pending',
       'isReported': false, // Ensure new pins start clean
+    });
+
+    // Validate asynchronously after save so posting is never blocked.
+    Future<void>(() async {
+      final geoValidation = await _validateSightingLocation(latLng);
+      final geoStatus = geoValidation['status'] ?? 'unknown';
+      final geoMessage = geoValidation['message'] ?? 'Location check unavailable';
+
+      try {
+        await sightingRef.update({
+          'geoValidationStatus': geoStatus,
+          'geoValidationMessage': geoMessage,
+        });
+      } catch (_) {
+        // Keep silent if rules don't allow extra fields.
+      }
     });
 
     if (mounted) {
@@ -541,8 +678,8 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         SnackBar(
           content: Text(
             isAnonymous
-              ? 'Anonymous sighting submitted! Awaiting moderator approval.'
-              : 'Sighting submitted as $displayName! Awaiting moderator approval.',
+                ? 'Anonymous sighting submitted! Awaiting moderator approval.'
+                : 'Sighting submitted as $displayName! Awaiting moderator approval.',
           ),
           duration: const Duration(seconds: 4), // Give them time to read it
         ),

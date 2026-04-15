@@ -19,13 +19,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   
   // State variables
   String _currentUserRole = 'mod'; // Default fallback
-  int _currentTabIndex = 0; // 0 = Sightings, 1 = Reports, 2 = Users
+  int _currentTabIndex = 0; // 0 = Sightings, 1 = Reports, 2 = Data, 3 = Users
   bool _isLoading = true;
   bool _isProcessing = false;
 
   // Data lists
   List<Map<String, dynamic>> _pendingSightings = [];
   List<Map<String, dynamic>> _reportedPosts = [];
+  List<Map<String, dynamic>> _fishCatalog = [];
   List<Map<String, dynamic>> _usersList = [];
   final Set<String> _selectedIds = {};
 
@@ -52,6 +53,406 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     // Data needed by both Admins and Mods
     _listenToPendingSightings();
     _listenToReportedPosts();
+    _listenToFishCatalog();
+  }
+
+  // ==========================================
+  // FISH CATALOG MANAGEMENT LOGIC
+  // ==========================================
+  void _listenToFishCatalog() {
+    _db.child('fish').onValue.listen((event) {
+      final List<Map<String, dynamic>> fish = [];
+
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final data = event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          final m = Map<dynamic, dynamic>.from(value);
+          fish.add({
+            'key': key.toString(),
+            'fishId': m['fishId']?.toString() ?? key.toString(),
+            'commonName': m['commonName']?.toString() ?? 'Unknown',
+            'scientificName': m['scientificName']?.toString() ?? 'N/A',
+            'localName': m['localName']?.toString() ?? 'N/A',
+            'habitat': m['habitat']?.toString() ?? 'Unknown',
+          });
+        });
+
+        fish.sort(
+          (a, b) => a['commonName'].toString().toLowerCase().compareTo(
+                b['commonName'].toString().toLowerCase(),
+              ),
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _fishCatalog = fish;
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  bool _isInvalidFirebaseKey(String value) {
+    return value.contains('.') ||
+        value.contains('#') ||
+        value.contains(r'$') ||
+        value.contains('[') ||
+        value.contains(']') ||
+        value.contains('/');
+  }
+
+  Future<void> _showFishFormDialog({Map<String, dynamic>? existingFish}) async {
+    final bool isEdit = existingFish != null;
+
+    final fishIdController = TextEditingController(text: existingFish?['fishId']?.toString() ?? '');
+    final commonNameController = TextEditingController(text: existingFish?['commonName']?.toString() ?? '');
+    final scientificNameController = TextEditingController(text: existingFish?['scientificName']?.toString() ?? '');
+    final localNameController = TextEditingController(text: existingFish?['localName']?.toString() ?? '');
+    final habitatController = TextEditingController(text: existingFish?['habitat']?.toString() ?? '');
+    final sizeRangeController = TextEditingController(text: existingFish?['sizeRange']?.toString() ?? '');
+    final imageUrlController = TextEditingController(text: existingFish?['imageUrl']?.toString() ?? '');
+    final conservationStatusController = TextEditingController(text: existingFish?['conservationStatus']?.toString() ?? '');
+    final conservationDetailsController = TextEditingController(text: existingFish?['conservationDetails']?.toString() ?? '');
+    final distributionController = TextEditingController(text: existingFish?['distribution']?.toString() ?? '');
+
+    final dynamic existingFeaturesDynamic = existingFish?['identifyingFeatures'];
+    final List<String> existingFeatures = existingFeaturesDynamic is List
+        ? existingFeaturesDynamic.map((e) => e.toString()).toList()
+        : [];
+    final identifyingFeaturesController = TextEditingController(text: existingFeatures.join(', '));
+
+    final formKey = GlobalKey<FormState>();
+
+    final bool? shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isEdit ? 'Edit Fish Data' : 'Add Fish Data'),
+        content: SizedBox(
+          width: 520,
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: fishIdController,
+                    enabled: !isEdit,
+                    decoration: const InputDecoration(
+                      labelText: 'Fish ID (Firebase key)',
+                      hintText: 'example: fish_51',
+                    ),
+                    validator: (value) {
+                      final v = (value ?? '').trim();
+                      if (v.isEmpty) return 'Fish ID is required';
+                      if (_isInvalidFirebaseKey(v)) {
+                        return 'Fish ID cannot contain . # \$ [ ] /';
+                      }
+                      final alreadyExists = _fishCatalog.any((f) => f['key'] == v);
+                      if (!isEdit && alreadyExists) return 'Fish ID already exists';
+                      return null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: commonNameController,
+                    decoration: const InputDecoration(labelText: 'Common Name'),
+                    validator: (value) => (value == null || value.trim().isEmpty)
+                        ? 'Common name is required'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: scientificNameController,
+                    decoration: const InputDecoration(labelText: 'Scientific Name'),
+                  ),
+                  TextFormField(
+                    controller: localNameController,
+                    decoration: const InputDecoration(labelText: 'Local Name'),
+                  ),
+                  TextFormField(
+                    controller: habitatController,
+                    decoration: const InputDecoration(labelText: 'Habitat'),
+                  ),
+                  TextFormField(
+                    controller: sizeRangeController,
+                    decoration: const InputDecoration(labelText: 'Size Range'),
+                  ),
+                  TextFormField(
+                    controller: imageUrlController,
+                    decoration: const InputDecoration(labelText: 'Image Asset Path'),
+                  ),
+                  TextFormField(
+                    controller: identifyingFeaturesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Identifying Features (comma-separated)',
+                    ),
+                    maxLines: 2,
+                  ),
+                  TextFormField(
+                    controller: conservationStatusController,
+                    decoration: const InputDecoration(labelText: 'Conservation Status'),
+                  ),
+                  TextFormField(
+                    controller: conservationDetailsController,
+                    decoration: const InputDecoration(labelText: 'Conservation Details'),
+                    maxLines: 2,
+                  ),
+                  TextFormField(
+                    controller: distributionController,
+                    decoration: const InputDecoration(labelText: 'Distribution'),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            icon: const Icon(Icons.save),
+            label: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSave != true) {
+      fishIdController.dispose();
+      commonNameController.dispose();
+      scientificNameController.dispose();
+      localNameController.dispose();
+      habitatController.dispose();
+      sizeRangeController.dispose();
+      imageUrlController.dispose();
+      conservationStatusController.dispose();
+      conservationDetailsController.dispose();
+      distributionController.dispose();
+      identifyingFeaturesController.dispose();
+      return;
+    }
+
+    final String recordKey = isEdit
+        ? existingFish!['key'].toString()
+        : fishIdController.text.trim();
+
+    final List<String> identifyingFeatures = identifyingFeaturesController.text
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    final Map<String, dynamic> payload = {
+      'fishId': fishIdController.text.trim(),
+      'commonName': commonNameController.text.trim(),
+      'scientificName': scientificNameController.text.trim(),
+      'localName': localNameController.text.trim(),
+      'habitat': habitatController.text.trim(),
+      'sizeRange': sizeRangeController.text.trim(),
+      'imageUrl': imageUrlController.text.trim(),
+      'identifyingFeatures': identifyingFeatures,
+      'conservationStatus': conservationStatusController.text.trim(),
+      'conservationDetails': conservationDetailsController.text.trim(),
+      'distribution': distributionController.text.trim(),
+    };
+
+    try {
+      await _db.child('fish/$recordKey').update(payload);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isEdit ? 'Fish data updated.' : 'Fish data added.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving fish data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      fishIdController.dispose();
+      commonNameController.dispose();
+      scientificNameController.dispose();
+      localNameController.dispose();
+      habitatController.dispose();
+      sizeRangeController.dispose();
+      imageUrlController.dispose();
+      conservationStatusController.dispose();
+      conservationDetailsController.dispose();
+      distributionController.dispose();
+      identifyingFeaturesController.dispose();
+    }
+  }
+
+  Future<void> _openEditFishDialog(Map<String, dynamic> fishSummary) async {
+    try {
+      final String key = fishSummary['key'].toString();
+      final snap = await _db.child('fish/$key').get();
+      if (!snap.exists || snap.value == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fish record not found.'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+
+      final full = Map<dynamic, dynamic>.from(snap.value as Map<dynamic, dynamic>);
+      final existingFish = {
+        'key': key,
+        ...full.map((k, v) => MapEntry(k.toString(), v)),
+      };
+
+      await _showFishFormDialog(existingFish: existingFish);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading fish data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<bool> _isFishReferenced(String fishId, String fishKey) async {
+    final sightingsSnap = await _db.child('user_sightings_temp').get();
+    if (sightingsSnap.exists && sightingsSnap.value != null) {
+      final sightings = sightingsSnap.value as Map<dynamic, dynamic>;
+      for (final value in sightings.values) {
+        final m = Map<dynamic, dynamic>.from(value);
+        final linkedFishId = m['fishId']?.toString() ?? '';
+        if (linkedFishId == fishId || linkedFishId == fishKey) return true;
+      }
+    }
+
+    final mapSnap = await _db.child('map').get();
+    if (mapSnap.exists && mapSnap.value != null) {
+      final mapEntries = mapSnap.value as Map<dynamic, dynamic>;
+      for (final value in mapEntries.values) {
+        final m = Map<dynamic, dynamic>.from(value);
+        final linkedFishId = m['fishId']?.toString() ?? '';
+        if (linkedFishId == fishId || linkedFishId == fishKey) return true;
+      }
+    }
+
+    return false;
+  }
+
+  Future<void> _deleteFish(Map<String, dynamic> fish) async {
+    final fishKey = fish['key'].toString();
+    final fishId = fish['fishId'].toString();
+    final fishName = fish['commonName'].toString();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Fish Data'),
+        content: Text('Delete "$fishName" ($fishId)? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final bool inUse = await _isFishReferenced(fishId, fishKey);
+      if (inUse) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot delete: this fish is referenced by map pins or sightings.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      await _db.child('fish/$fishKey').remove();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fish data deleted.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting fish data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  List<String> _coreSightingValidationErrors(Map<dynamic, dynamic> raw) {
+    final errors = <String>[];
+    final fishId = raw['fishId']?.toString().trim() ?? '';
+    final fishName = raw['fishName']?.toString().trim() ?? '';
+    final lat = (raw['latitude'] as num?)?.toDouble();
+    final lng = (raw['longitude'] as num?)?.toDouble();
+    final geoStatus = (raw['geoValidationStatus'] ?? '').toString().toLowerCase();
+    final geoMessage = (raw['geoValidationMessage'] ?? '').toString();
+
+    if (fishId.isEmpty) errors.add('Missing fish ID');
+    if (fishName.isEmpty) errors.add('Missing fish name');
+    if (lat == null || lat < -90 || lat > 90) errors.add('Invalid latitude');
+    if (lng == null || lng < -180 || lng > 180) errors.add('Invalid longitude');
+    if (geoStatus.isEmpty) {
+      errors.add('Location validation missing');
+    } else if (geoStatus != 'water') {
+      errors.add(
+        geoMessage.isNotEmpty
+            ? 'Location validation failed: $geoMessage'
+            : 'Location is not confirmed as water',
+      );
+    }
+
+    return errors;
+  }
+
+  List<String> _approvalValidationErrors(Map<String, dynamic> sighting, Set<String> knownFishIds) {
+    final errors = <String>[];
+
+    final fishId = sighting['fishId']?.toString() ?? '';
+    final lat = (sighting['latitude'] as num?)?.toDouble();
+    final lng = (sighting['longitude'] as num?)?.toDouble();
+    final geoStatus = (sighting['geoValidationStatus'] ?? '').toString().toLowerCase();
+    final geoMessage = (sighting['geoValidationMessage'] ?? '').toString();
+
+    if (fishId.isEmpty) errors.add('Missing fish ID');
+    if (fishId.isNotEmpty && !knownFishIds.contains(fishId)) {
+      errors.add('Fish ID does not exist in catalog');
+    }
+    if (lat == null || lat < -90 || lat > 90) errors.add('Invalid latitude');
+    if (lng == null || lng < -180 || lng > 180) errors.add('Invalid longitude');
+    if (geoStatus != 'water') {
+      errors.add(
+        geoMessage.isNotEmpty
+            ? 'Location validation failed: $geoMessage'
+            : 'Location is not confirmed as water',
+      );
+    }
+
+    return errors;
   }
 
   // ==========================================
@@ -65,15 +466,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         
         data.forEach((key, value) {
           final m = value as Map<dynamic, dynamic>;
+          final validationErrors = _coreSightingValidationErrors(m);
+
           // FIX: Check for BOTH pending status OR reported flag
           if (m['status'] == 'pending' || m['isReported'] == true) {
             pending.add({
               'id': key.toString(),
+              'fishId': m['fishId']?.toString() ?? '',
               'fishName': m['fishName']?.toString() ?? 'Unknown Fish',
               'displayName': m['displayName']?.toString() ?? 'Anonymous',
               'notes': m['notes']?.toString() ?? 'No notes provided.',
+              'latitude': (m['latitude'] as num?)?.toDouble(),
+              'longitude': (m['longitude'] as num?)?.toDouble(),
+              'geoValidationStatus': m['geoValidationStatus']?.toString() ?? '',
+              'geoValidationMessage': m['geoValidationMessage']?.toString() ?? '',
               'timestamp': m['createdAt'] ?? 0,
               'isReported': m['isReported'] == true, // Track report status
+              'isCoreValid': validationErrors.isEmpty,
+              'validationMessage': validationErrors.join(', '),
             });
           }
         });
@@ -104,7 +514,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     try {
       final Map<String, dynamic> updates = {};
+      int blockedCount = 0;
+      final List<String> blockedReasons = [];
+
+      final Set<String> knownFishIds = {
+        ..._fishCatalog.map((f) => f['fishId'].toString()),
+        ..._fishCatalog.map((f) => f['key'].toString()),
+      };
+
       for (String id in _selectedIds) {
+        final sighting = _pendingSightings.firstWhere(
+          (item) => item['id'] == id,
+          orElse: () => {},
+        );
+
+        if (sighting.isEmpty) continue;
+
+        if (newStatus == 'approved') {
+          final errors = _approvalValidationErrors(sighting, knownFishIds);
+          if (errors.isNotEmpty) {
+            blockedCount++;
+            blockedReasons.add('${sighting['fishName']}: ${errors.join(', ')}');
+            continue;
+          }
+        }
+
         updates['user_sightings_temp/$id/status'] = newStatus;
         
         // FIX: If moderator approves a reported pin, clear the report flag
@@ -112,15 +546,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           updates['user_sightings_temp/$id/isReported'] = false;
         }
       }
-      await _db.update(updates);
+
+      if (updates.isNotEmpty) {
+        await _db.update(updates);
+      }
 
       if (mounted) {
+        final int updatedCount = updates.keys.where((k) => k.endsWith('/status')).length;
+        final String baseMessage = updatedCount > 0
+            ? '$updatedCount sightings marked as $newStatus.'
+            : 'No sightings were updated.';
+
+        final String blockedMessage = blockedCount > 0
+            ? ' $blockedCount blocked by validation.'
+            : '';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_selectedIds.length} sightings marked as $newStatus!'),
+            content: Text('$baseMessage$blockedMessage'),
             backgroundColor: newStatus == 'approved' ? Colors.green : Colors.grey[800],
           ),
         );
+
+        if (blockedReasons.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Validation: ${blockedReasons.take(2).join(' | ')}'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
       setState(() => _selectedIds.clear());
     } catch (e) {
@@ -264,7 +720,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ? null 
                     : () => _updateSelectedStatus('archived'),
                 icon: const Icon(Icons.archive),
-                label: const Text('Archive Selected'),
+                label: const Text('Disapprove Selected'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey[300],
                   foregroundColor: Colors.black87,
@@ -299,6 +755,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     columns: const [
                       DataColumn(label: Text('Submitted By', style: TextStyle(fontWeight: FontWeight.bold))),
                       DataColumn(label: Text('Fish Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Validation', style: TextStyle(fontWeight: FontWeight.bold))),
                       DataColumn(label: Text('User Notes', style: TextStyle(fontWeight: FontWeight.bold))),
                     ],
                     rows: _pendingSightings.map((sighting) {
@@ -326,6 +783,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   const Icon(Icons.flag, color: Colors.orange, size: 16),
                                 ]
                               ],
+                            ),
+                          ),
+                          DataCell(
+                            Tooltip(
+                              message: sighting['isCoreValid'] == true
+                                  ? 'Core validation passed'
+                                  : (sighting['validationMessage']?.toString().isNotEmpty == true
+                                      ? sighting['validationMessage'].toString()
+                                      : 'Invalid data'),
+                              child: Chip(
+                                label: Text(
+                                  sighting['isCoreValid'] == true ? 'Valid' : 'Invalid',
+                                  style: TextStyle(
+                                    color: sighting['isCoreValid'] == true ? Colors.green[900] : Colors.red[900],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                backgroundColor: sighting['isCoreValid'] == true
+                                    ? Colors.green[100]
+                                    : Colors.red[100],
+                                side: BorderSide.none,
+                              ),
                             ),
                           ),
                           DataCell(
@@ -511,11 +990,97 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Widget _buildFishManagement() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.teal[50],
+          child: Row(
+            children: [
+              Text(
+                'Total Fish Records: ${_fishCatalog.length}',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal[900]),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () => _showFishFormDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Fish'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _fishCatalog.isEmpty
+              ? const Center(
+                  child: Text('No fish records found.', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Fish ID', style: TextStyle(fontWeight: FontWeight.bold))),
+                        DataColumn(label: Text('Common Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                        DataColumn(label: Text('Scientific Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                        DataColumn(label: Text('Habitat', style: TextStyle(fontWeight: FontWeight.bold))),
+                        DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                      ],
+                      rows: _fishCatalog.map((fish) {
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(fish['fishId'].toString())),
+                            DataCell(Text(fish['commonName'].toString())),
+                            DataCell(
+                              SizedBox(
+                                width: 220,
+                                child: Text(
+                                  fish['scientificName'].toString(),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            DataCell(Text(fish['habitat'].toString())),
+                            DataCell(
+                              Row(
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Edit fish',
+                                    onPressed: () => _openEditFishDialog(fish),
+                                    icon: const Icon(Icons.edit, color: Colors.blue),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete fish',
+                                    onPressed: () => _deleteFish(fish),
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
   // Determine which view to render based on the selected tab
   Widget _buildBody() {
     if (_currentTabIndex == 0) return _buildSightingsQueue();
     if (_currentTabIndex == 1) return _buildReportedPostsQueue();
-    if (_currentTabIndex == 2 && _currentUserRole == 'admin') return _buildUserManagement();
+    if (_currentTabIndex == 2) return _buildFishManagement();
+    if (_currentTabIndex == 3 && _currentUserRole == 'admin') return _buildUserManagement();
     return const Center(child: Text('Unauthorized access'));
   }
 
@@ -524,6 +1089,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     List<BottomNavigationBarItem> items = [
       const BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Sightings'),
       const BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'Reports'),
+      const BottomNavigationBarItem(icon: Icon(Icons.storage), label: 'Data'),
     ];
     if (_currentUserRole == 'admin') {
       items.add(const BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'));
@@ -538,6 +1104,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         title: Text(
           _currentTabIndex == 0 ? 'Sightings Queue' 
           : _currentTabIndex == 1 ? 'Reported Posts' 
+          : _currentTabIndex == 2 ? 'Fish Data'
           : 'User Management'
         ),
         backgroundColor: Colors.blue[900],
