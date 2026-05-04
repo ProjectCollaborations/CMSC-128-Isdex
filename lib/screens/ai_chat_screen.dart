@@ -5,7 +5,10 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'theme.dart';
+import 'user_sightings_map_screen.dart';
+import 'landing_page.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -17,6 +20,7 @@ class AiChatScreen extends StatefulWidget {
 class _AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
   bool _isAITyping = false;
@@ -201,100 +205,140 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = user?.email?.split('@')[0] ?? 'User';
+
     return Scaffold(
       backgroundColor: kBackground,
       appBar: AppBar(
         title: const Text(
           'Isdex AI Assistant',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        backgroundColor: kDarkNavy,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        foregroundColor: kDarkNavy,
         elevation: 0,
+        centerTitle: true,
         actions: [
           IconButton(
             onPressed: _isAITyping ? null : _clearChat,
-            icon: const Icon(Icons.delete_sweep_outlined),
+            icon: const Icon(Icons.delete_sweep_outlined, color: kDarkNavy),
             tooltip: 'Clear chat',
           ),
         ],
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: StreamBuilder(
-              stream: _db.child('chat_sessions/$_userId').onValue,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          size: 64,
-                          color: Colors.blue.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Ask me anything about Philippine fish!',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final data = Map<dynamic, dynamic>.from(
-                  snapshot.data!.snapshot.value as Map,
-                );
-                final messages = data.entries.toList()
-                  ..sort(
-                    (a, b) => b.value['timestamp'].compareTo(a.value['timestamp']),
-                  );
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
-                  ),
-                  reverse: true,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index].value;
-                    final isUser = msg['role'] == 'user';
-                    final content = msg['content'] as String;
-                    final ts = msg['timestamp'] as int;
-                    final timeStr = DateFormat('jm').format(
-                      DateTime.fromMillisecondsSinceEpoch(ts),
-                    );
-
-                    return _buildMessageBubble(content, isUser, timeStr);
-                  },
-                );
-              },
+          // Greeting Section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+            child: Text(
+              'Hi, ${userName[0].toUpperCase()}${userName.substring(1)}!',
+              style: const TextStyle(
+                color: kDarkNavy,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
+
+          // Shortcut Buttons Row
+          _buildShortcutsRow(),
+
+          const SizedBox(height: 16),
+
+          // Chat Flow
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: StreamBuilder(
+                stream: _db.child('chat_sessions/$_userId').onValue,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: kAccentBlue));
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome,
+                            size: 64,
+                            color: kAccentBlue.withValues(alpha: 0.2),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Ask me anything about Philippine fish!',
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final data = Map<dynamic, dynamic>.from(
+                    snapshot.data!.snapshot.value as Map,
+                  );
+                  final messages = data.entries.toList()
+                    ..sort(
+                      (a, b) => b.value['timestamp'].compareTo(a.value['timestamp']),
+                    );
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 24,
+                    ),
+                    reverse: true,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = messages[index].value;
+                      final isUser = msg['role'] == 'user';
+                      final content = msg['content'] as String;
+                      final ts = msg['timestamp'] as int;
+                      final timeStr = DateFormat('jm').format(
+                        DateTime.fromMillisecondsSinceEpoch(ts),
+                      );
+
+                      return _buildMessageBubble(content, isUser, timeStr);
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+          
           if (_isAITyping)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, bottom: 8),
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.only(left: 24, bottom: 8),
               child: Row(
                 children: [
                   const SizedBox(
                     width: 12,
                     height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: kAccentBlue),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
+                  const SizedBox(width: 10),
+                  const Text(
                     'AI is thinking...',
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: Colors.grey,
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
                     ),
@@ -308,45 +352,112 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  Widget _buildShortcutsRow() {
+    final shortcuts = [
+      {'label': 'Identify Fish', 'icon': Icons.search},
+      {'label': 'Log Sighting', 'icon': Icons.add_location_alt},
+      {'label': 'Nearby Sightings', 'icon': Icons.map},
+      {'label': 'My Logbook', 'icon': Icons.book},
+      {'label': 'Browse Index', 'icon': Icons.list_alt},
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: shortcuts.map((shortcut) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ActionChip(
+              onPressed: () => _handleShortcut(shortcut['label'] as String),
+              label: Text(
+                shortcut['label'] as String,
+                style: const TextStyle(color: kDarkNavy, fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              avatar: Icon(shortcut['icon'] as IconData, size: 16, color: kAccentBlue),
+              backgroundColor: Colors.white,
+              side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _handleShortcut(String label) {
+    switch (label) {
+      case 'Identify Fish':
+        setState(() {
+          _messageController.text = "I want to identify a fish. Here are the details:\n- Size: \n- Color: \n- Location seen: ";
+        });
+        _focusNode.requestFocus();
+        break;
+      case 'Log Sighting':
+      case 'Nearby Sightings':
+      case 'My Logbook':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSightingsMapScreen()));
+        break;
+      case 'Browse Index':
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LandingPage()),
+          (route) => false,
+        );
+        break;
+    }
+  }
+
   Widget _buildMessageBubble(String content, bool isUser, String timeStr) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Container(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
+              maxWidth: MediaQuery.of(context).size.width * 0.8,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isUser ? kAccentBlue : Colors.white,
+              color: isUser ? kAccentBlue : Colors.grey.withValues(alpha: 0.1),
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isUser ? 16 : 0),
-                bottomRight: Radius.circular(isUser ? 0 : 16),
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(isUser ? 20 : 4),
+                bottomRight: Radius.circular(isUser ? 4 : 20),
               ),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
+                if (!isUser)
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
               ],
             ),
-            child: Text(
-              content,
-              style: TextStyle(
-                color: isUser ? Colors.white : kDarkNavy,
-                fontSize: 15,
-              ),
-            ),
+            child: isUser
+                ? Text(
+                    content,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                  )
+                : MarkdownBody(
+                    data: content,
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(color: kDarkNavy, fontSize: 15),
+                      strong: const TextStyle(color: kDarkNavy, fontWeight: FontWeight.bold),
+                      listBullet: const TextStyle(color: kAccentBlue),
+                    ),
+                  ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            timeStr,
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              timeStr,
+              style: TextStyle(fontSize: 10, color: Colors.grey.withValues(alpha: 0.6)),
+            ),
           ),
         ],
       ),
@@ -355,58 +466,59 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, -2),
-            blurRadius: 10,
-          ),
-        ],
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: kBackground,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+              ),
               child: TextField(
                 controller: _messageController,
+                focusNode: _focusNode,
                 textCapitalization: TextCapitalization.sentences,
-                // Disable input while AI is typing
                 enabled: !_isAITyping,
+                style: const TextStyle(color: kDarkNavy),
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
-                  hintStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: kBackground,
+                  hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.6)),
+                  border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: BorderSide.none,
+                    vertical: 12,
                   ),
                 ),
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              // Prevent double-tap while AI is typing
-              onTap: _isAITyping ? null : _sendMessage,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _isAITyping ? Colors.grey : kDarkNavy,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.send, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _isAITyping ? null : _sendMessage,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _isAITyping ? Colors.grey.withValues(alpha: 0.2) : kAccentBlue,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  if (!_isAITyping)
+                    BoxShadow(
+                      color: kAccentBlue.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                ],
               ),
+              child: const Icon(Icons.send_rounded, color: Colors.white, size: 24),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
