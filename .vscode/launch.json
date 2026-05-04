@@ -1,0 +1,46 @@
+{
+  // .vscode/launch.json
+  // ───────────────────────────────────────────────────────────────────────────
+  // Commit this file. It reads IUCN_API_TOKEN from each developer's local
+  // system environment variable — no token is ever stored in this file.
+  //
+  // Each collaborator must set IUCN_API_TOKEN on their machine once:
+  //
+  //   macOS / Linux  → add to ~/.zshrc or ~/.bashrc:
+  //     export IUCN_API_TOKEN=your_token_here
+  //     (then restart your terminal or run: source ~/.zshrc)
+  //
+  //   Windows        → run in Command Prompt (then restart VS Code):
+  //     setx IUCN_API_TOKEN "your_token_here"
+  // ───────────────────────────────────────────────────────────────────────────
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Debug (Android)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=IUCN_API_TOKEN=${env:IUCN_API_TOKEN}"
+      ]
+    },
+    {
+      "name": "Debug (iOS)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "ios",
+      "args": [
+        "--dart-define=IUCN_API_TOKEN=${env:IUCN_API_TOKEN}"
+      ]
+    },
+    {
+      "name": "Profile",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "args": [
+        "--dart-define=IUCN_API_TOKEN=${env:IUCN_API_TOKEN}"
+      ]
+    }
+  ]
+}
