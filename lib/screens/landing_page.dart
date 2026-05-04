@@ -7,6 +7,7 @@ import 'login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_sightings_map_screen.dart';
 import 'ai_chat_screen.dart';
+import 'fish_image_search.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -226,21 +227,33 @@ void _showFishDetails(Map<dynamic, dynamic> fish) {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(25),
+Container(
+  decoration: BoxDecoration(
+    color: Colors.blue[50],
+    borderRadius: BorderRadius.circular(25),
+  ),
+          child: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search Species',
+              border: InputBorder.none,
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.camera_alt, color: Colors.blue),
+                tooltip: 'Search by photo',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FishImageSearch(allSpecies: allSpecies),
                     ),
-                    child: TextField(
-                      controller: searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Search Species',
-                        border: InputBorder.none,
-                        prefixIcon: Icon(Icons.search, color: Colors.grey),
-                        contentPadding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
