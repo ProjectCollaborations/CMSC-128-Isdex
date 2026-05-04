@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'map_screen.dart';
+import '../services/iucn_service.dart';
 
-class FishDetailPage extends StatelessWidget {
+class FishDetailPage extends StatefulWidget {
   final Map<dynamic, dynamic> fish;
 
   const FishDetailPage({super.key, required this.fish});
 
+  @override
+  State<FishDetailPage> createState() => _FishDetailPageState();
+}
+
+class _FishDetailPageState extends State<FishDetailPage> {
   // ── IUCN status → color mapping ───────────────────────────────────────────
   static const Map<String, Color> _statusColors = {
     'Extinct (EX)':               Color(0xFF000000),
@@ -19,18 +25,55 @@ class FishDetailPage extends StatelessWidget {
     'Not Evaluated (NE)':         Color(0xFF9E9E9E),
   };
 
-  // Short abbreviation shown inside the badge dot overlay on the image
   static const Map<String, String> _statusAbbr = {
-    'Extinct':              'EX',
-    'Extinct in the Wild':  'EW',
-    'Critically':           'CR',
-    'Endangered':           'EN',
-    'Vulnerable':           'VU',
-    'Near':                 'NT',
-    'Least':                'LC',
-    'Data':                 'DD',
-    'Not':                  'NE',
+    'Extinct in': 'EW',
+    'Extinct':    'EX',
+    'Critically': 'CR',
+    'Endangered': 'EN',
+    'Vulnerable': 'VU',
+    'Near':       'NT',
+    'Least':      'LC',
+    'Data':       'DD',
+    'Not':        'NE',
   };
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  IucnResult? _iucnData;
+  bool _iucnLoading = true;
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _loadIucnStatus();
+  }
+
+  Future<void> _loadIucnStatus() async {
+    final scientificName = widget.fish['scientificName']?.toString();
+    if (scientificName == null || scientificName.isEmpty) {
+      if (mounted) setState(() => _iucnLoading = false);
+      return;
+    }
+
+    final result = await IucnService.getStatus(scientificName);
+    if (mounted) {
+      setState(() {
+        _iucnData = result;
+        _iucnLoading = false;
+      });
+    }
+  }
+
+  // ── Derived helpers ───────────────────────────────────────────────────────
+
+  /// Live IUCN status, falling back to the RTDB value while loading or on error.
+  String? get _status {
+    if (_iucnData != null && _iucnData != IucnResult.unknown) {
+      return _iucnData!.conservationStatus;
+    }
+    // Fallback: value stored in RTDB (shown while loading or if token missing)
+    return widget.fish['conservationStatus']?.toString();
+  }
 
   Color _statusColor(String? status) {
     if (status == null) return const Color(0xFF9E9E9E);
@@ -48,10 +91,10 @@ class FishDetailPage extends StatelessWidget {
     return 'NE';
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final String? status = fish['conservationStatus']?.toString();
-    final Color statusColor = _statusColor(status);
+    final Color statusColor = _statusColor(_status);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -89,7 +132,7 @@ class FishDetailPage extends StatelessWidget {
                     // Fish name
                     Center(
                       child: Text(
-                        fish['commonName'] ?? 'Unknown',
+                        widget.fish['commonName'] ?? 'Unknown',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -111,10 +154,10 @@ class FishDetailPage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: (fish['imageUrl'] != null &&
-                                  fish['imageUrl'].toString().isNotEmpty)
+                          child: (widget.fish['imageUrl'] != null &&
+                                  widget.fish['imageUrl'].toString().isNotEmpty)
                               ? Image.asset(
-                                  fish['imageUrl'],
+                                  widget.fish['imageUrl'],
                                   fit: BoxFit.fitWidth,
                                   width: double.infinity,
                                   height: 200,
@@ -132,18 +175,21 @@ class FishDetailPage extends StatelessWidget {
                         ),
 
                         // ── Conservation badge overlaid on image (top-right) ──
-                        if (status != null)
-                          Positioned(
-                            top: 24,
-                            right: 8,
-                            child: _buildImageBadge(status, statusColor),
-                          ),
+                        Positioned(
+                          top: 24,
+                          right: 8,
+                          child: _iucnLoading
+                              ? _buildLoadingBadge()
+                              : _buildImageBadge(_status, statusColor),
+                        ),
                       ],
                     ),
 
                     // ── Inline status strip (below image, above tabs) ─────────
-                    if (status != null) ...[
-                      _buildStatusStrip(status, statusColor),
+                    if (_iucnLoading)
+                      _buildLoadingStrip()
+                    else if (_status != null) ...[
+                      _buildStatusStrip(_status!, statusColor),
                       const SizedBox(height: 16),
                     ],
 
@@ -153,13 +199,15 @@ class FishDetailPage extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     // Common Name
-                    _buildInfoSection('Common Name', fish['commonName'] ?? 'Unknown'),
+                    _buildInfoSection(
+                        'Common Name', widget.fish['commonName'] ?? 'Unknown'),
 
                     // Scientific Name
-                    _buildInfoRow('Scientific Name', fish['scientificName'] ?? 'N/A'),
+                    _buildInfoRow(
+                        'Scientific Name', widget.fish['scientificName'] ?? 'N/A'),
 
                     // Local Name
-                    _buildInfoRow('Local Name', fish['localName'] ?? 'N/A'),
+                    _buildInfoRow('Local Name', widget.fish['localName'] ?? 'N/A'),
 
                     const SizedBox(height: 24),
 
@@ -167,7 +215,7 @@ class FishDetailPage extends StatelessWidget {
                     _buildSectionHeader('Size Range'),
                     const SizedBox(height: 8),
                     Text(
-                      fish['sizeRange'] ?? 'N/A',
+                      widget.fish['sizeRange'] ?? 'N/A',
                       style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
 
@@ -176,8 +224,9 @@ class FishDetailPage extends StatelessWidget {
                     // Identifying Features
                     _buildSectionHeader('Identifying Features'),
                     const SizedBox(height: 8),
-                    if (fish['identifyingFeatures'] != null)
-                      ...List.from(fish['identifyingFeatures']).map((feature) {
+                    if (widget.fish['identifyingFeatures'] != null)
+                      ...List.from(widget.fish['identifyingFeatures'])
+                          .map((feature) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
@@ -212,7 +261,7 @@ class FishDetailPage extends StatelessWidget {
                       spacing: 8,
                       children: [
                         Chip(
-                          label: Text(fish['habitat'] ?? 'Unknown',
+                          label: Text(widget.fish['habitat'] ?? 'Unknown',
                               style: const TextStyle(fontSize: 12)),
                           backgroundColor: Colors.blue[50],
                           side: const BorderSide(color: Colors.blue),
@@ -226,11 +275,11 @@ class FishDetailPage extends StatelessWidget {
                     _buildConservationStatusSection(),
 
                     // Distribution
-                    if (fish['distribution'] != null) ...[
+                    if (widget.fish['distribution'] != null) ...[
                       _buildSectionHeader('Distribution'),
                       const SizedBox(height: 8),
                       Text(
-                        fish['distribution'],
+                        widget.fish['distribution'],
                         style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       ),
                       const SizedBox(height: 24),
@@ -245,8 +294,61 @@ class FishDetailPage extends StatelessWidget {
     );
   }
 
-  // ── Small pill badge overlaid on the fish image ────────────────────────────
-  Widget _buildImageBadge(String status, Color color) {
+  // ── Loading placeholders ──────────────────────────────────────────────────
+
+  Widget _buildLoadingBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.grey[400],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(width: 5),
+          Text('...', style: TextStyle(color: Colors.white, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingStrip() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.5),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Loading conservation status…',
+            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Small pill badge overlaid on the fish image ───────────────────────────
+  Widget _buildImageBadge(String? status, Color color) {
     final abbr = _statusAbbreviation(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -316,8 +418,7 @@ class FishDetailPage extends StatelessWidget {
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
               color: color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(20),
@@ -337,12 +438,37 @@ class FishDetailPage extends StatelessWidget {
     );
   }
 
-  // ── Full conservation detail card (bottom of scroll) ──────────────────────
+  // ── Full conservation detail card ─────────────────────────────────────────
   Widget _buildConservationStatusSection() {
-    final String? status  = fish['conservationStatus']?.toString();
-    final String? details = fish['conservationDetails']?.toString();
-    final color           = _statusColor(status);
-    final lightColor      = color.withOpacity(0.10);
+    final color = _statusColor(_status);
+    final lightColor = color.withOpacity(0.10);
+
+    // Skeleton card while loading
+    if (_iucnLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('Conservation Status'),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,7 +487,7 @@ class FishDetailPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Badge row
+              // Status badge row
               Row(
                 children: [
                   Container(
@@ -373,7 +499,7 @@ class FishDetailPage extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      status ?? 'Not Evaluated (NE)',
+                      _status ?? 'Not Evaluated (NE)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -382,8 +508,8 @@ class FishDetailPage extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -401,22 +527,55 @@ class FishDetailPage extends StatelessWidget {
                 ],
               ),
 
-              // ── IUCN threat scale ──────────────────────────────────────────
+              // Threat scale
               const SizedBox(height: 12),
-              _buildIucnScale(status),
+              _buildIucnScale(_status),
 
-              // Details
-              if (details != null && details.isNotEmpty) ...[
+              // Population trend (from live IUCN API)
+              if (_iucnData?.populationTrend != null) ...[
+                const SizedBox(height: 10),
+                Divider(color: color.withOpacity(0.25), height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(_trendIcon(_iucnData!.populationTrend!),
+                        size: 16, color: color),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Population trend: ${_iucnData!.populationTrend}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              // Supplementary details from RTDB (kept as extra context)
+              if (widget.fish['conservationDetails'] != null &&
+                  (widget.fish['conservationDetails'] as String)
+                      .isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Divider(color: color.withOpacity(0.25), height: 1),
                 const SizedBox(height: 10),
                 Text(
-                  details,
+                  widget.fish['conservationDetails'],
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey[700],
                     height: 1.5,
                   ),
+                ),
+              ],
+
+              // IUCN source link
+              if (_iucnData?.iucnUrl != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Source: IUCN Red List  •  ${_iucnData!.iucnUrl}',
+                  style: TextStyle(fontSize: 10, color: Colors.grey[400]),
                 ),
               ],
             ],
@@ -428,9 +587,21 @@ class FishDetailPage extends StatelessWidget {
     );
   }
 
-  // ── IUCN threat-level scale bar ────────────────────────────────────────────
+  IconData _trendIcon(String trend) {
+    switch (trend.toLowerCase()) {
+      case 'decreasing':
+        return Icons.trending_down;
+      case 'increasing':
+        return Icons.trending_up;
+      case 'stable':
+        return Icons.trending_flat;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  // ── IUCN threat-level scale bar ───────────────────────────────────────────
   Widget _buildIucnScale(String? currentStatus) {
-    // Ordered from least to most severe (left → right)
     final levels = [
       ('LC', const Color(0xFF006400)),
       ('NT', const Color(0xFF2E8B57)),
@@ -457,14 +628,13 @@ class FishDetailPage extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: levels.map((entry) {
-            final abbr  = entry.$1;
+            final abbr = entry.$1;
             final color = entry.$2;
             final isActive = abbr == currentAbbr;
 
             return Expanded(
               child: Column(
                 children: [
-                  // Colored segment
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     height: isActive ? 10 : 6,
@@ -479,9 +649,8 @@ class FishDetailPage extends StatelessWidget {
                     abbr,
                     style: TextStyle(
                       fontSize: 9,
-                      fontWeight: isActive
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                          isActive ? FontWeight.bold : FontWeight.normal,
                       color: isActive ? color : Colors.grey[400],
                     ),
                   ),
@@ -500,10 +669,11 @@ class FishDetailPage extends StatelessWidget {
       children: [
         _buildTab('Information', true, () {}),
         _buildTab('Map', false, () {
-          final String? fishId = fish['fishId']?.toString();
+          final String? fishId = widget.fish['fishId']?.toString();
           if (fishId == null) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No fishId found for this fish')),
+              const SnackBar(
+                  content: Text('No fishId found for this fish')),
             );
             return;
           }
@@ -512,7 +682,7 @@ class FishDetailPage extends StatelessWidget {
             MaterialPageRoute(
               builder: (_) => MapScreen(
                 fishId: fishId,
-                fishName: fish['commonName'] ?? 'Fish',
+                fishName: widget.fish['commonName'] ?? 'Fish',
               ),
             ),
           );
@@ -593,7 +763,8 @@ class FishDetailPage extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
           ),
         ],
