@@ -24,8 +24,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   LatLng? _userLocation;
 
   List<Map<String, dynamic>> _fishList = [];
+  Set<String> _activeFishIds = {};
   bool _fishLoaded = false;
   bool _isLocating = false;
+  Map<dynamic, dynamic>? _lastSightingsData;
 
   Future<Map<String, String>> _validateSightingLocation(LatLng latLng) async {
     final client = HttpClient();
@@ -153,25 +155,47 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     _getUserLocationOnStartup();
   }
 
-  Future<void> _loadFishList() async {
-    final snap = await _db.child('fish').get();
-    if (!snap.exists || snap.value == null) {
-      setState(() { _fishLoaded = true; _fishList = []; });
-      return;
-    }
+  void _loadFishList() {
+    _db.child('fish').onValue.listen((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        if (mounted) {
+          setState(() {
+            _fishLoaded = true;
+            _fishList = [];
+            _activeFishIds = {};
+          });
+        }
+        _rebuildMarkersFromSightings();
+        return;
+      }
 
-    final Map<dynamic, dynamic> fishMap = snap.value as Map<dynamic, dynamic>;
-    final List<Map<String, dynamic>> list = [];
-    fishMap.forEach((key, value) {
-      final m = Map<dynamic, dynamic>.from(value);
-      list.add({
-        'fishId': m['fishId']?.toString() ?? key.toString(),
-        'commonName': m['commonName']?.toString() ?? 'Unknown',
+      final Map<dynamic, dynamic> fishMap = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> list = [];
+      final Set<String> ids = {};
+
+      fishMap.forEach((key, value) {
+        final m = Map<dynamic, dynamic>.from(value);
+        final String fishId = m['fishId']?.toString() ?? key.toString();
+        list.add({
+          'fishId': fishId,
+          'commonName': m['commonName']?.toString() ?? 'Unknown',
+        });
+        ids.add(fishId);
+        ids.add(key.toString());
       });
-    });
 
-    list.sort((a, b) => a['commonName'].toString().compareTo(b['commonName'].toString()));
-    setState(() { _fishList = list; _fishLoaded = true; });
+      list.sort((a, b) => a['commonName'].toString().compareTo(b['commonName'].toString()));
+
+      if (mounted) {
+        setState(() {
+          _fishList = list;
+          _activeFishIds = ids;
+          _fishLoaded = true;
+        });
+      }
+
+      _rebuildMarkersFromSightings();
+    });
   }
 
   Future<void> _getUserLocationOnStartup() async {
@@ -212,228 +236,244 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
   void _listenToUserSightings() {
     _db.child('user_sightings_temp').onValue.listen((event) {
-      final List<Marker> markers = [];
-
       if (event.snapshot.exists && event.snapshot.value != null) {
-        final data = event.snapshot.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          final m = value as Map<dynamic, dynamic>;
-          final lat = (m['latitude'] as num?)?.toDouble();
-          final lng = (m['longitude'] as num?)?.toDouble();
-          if (lat == null || lng == null) return;
+        _lastSightingsData = event.snapshot.value as Map<dynamic, dynamic>;
+      } else {
+        _lastSightingsData = null;
+      }
 
-          final fishName = (m['fishName'] ?? 'Sighting').toString();
-          final notes = (m['notes'] ?? '').toString();
-          final fishId = (m['fishId'] ?? '').toString();
-          final ownerId = (m['userId'] ?? '').toString();
-          final displayName = (m['displayName'] ?? 'Anonymous').toString();
-          final status = (m['status'] ?? 'pending').toString(); // Default to pending
-          
-          final currentUser = FirebaseAuth.instance.currentUser;
-          final isOwner = currentUser != null && currentUser.uid == ownerId;
+      _rebuildMarkersFromSightings();
+    });
+  }
 
-          // MODERATION FILTER: 
-          // If it is NOT approved, and the current user is NOT the owner, hide it.
-          if (status != 'approved' && !isOwner) {
-            return; 
-          }
+  void _rebuildMarkersFromSightings() {
+    final data = _lastSightingsData;
+    final List<Marker> markers = [];
 
-          // UX: Pending pins are orange, approved are red.
-          final pinColor = status == 'pending' ? Colors.orange : Colors.red;
+    if (data != null) {
+      data.forEach((key, value) {
+        final m = value as Map<dynamic, dynamic>;
+        final lat = (m['latitude'] as num?)?.toDouble();
+        final lng = (m['longitude'] as num?)?.toDouble();
+        if (lat == null || lng == null) return;
 
-          markers.add(
-            Marker(
-              point: LatLng(lat, lng),
-              width: 80,
-              height: 80,
-              child: GestureDetector(
-                onTap: () async {
-                  if (!mounted) return;
+        final fishName = (m['fishName'] ?? 'Sighting').toString();
+        final notes = (m['notes'] ?? '').toString();
+        final fishId = (m['fishId'] ?? '').toString();
+        final ownerId = (m['userId'] ?? '').toString();
+        final displayName = (m['displayName'] ?? 'Anonymous').toString();
+        final status = (m['status'] ?? 'pending').toString(); // Default to pending
 
-                  final action = await showDialog<String>(
-                    context: context,
-                    builder: (context) => SimpleDialog(
-                      title: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(fishName,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text(
-                            status == 'pending' 
-                                ? 'Status: Pending Moderator Approval' 
-                                : 'User-submitted sighting. May not be scientifically verified.',
-                            style: TextStyle(
-                              fontSize: 13, 
-                              color: status == 'pending' ? Colors.orange[700] : Colors.grey[700], 
-                              fontStyle: FontStyle.italic,
-                              fontWeight: status == 'pending' ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
+        if (_fishLoaded && fishId.isNotEmpty && !_activeFishIds.contains(fishId)) {
+          return;
+        }
+
+        final currentUser = FirebaseAuth.instance.currentUser;
+        final isOwner = currentUser != null && currentUser.uid == ownerId;
+
+        // MODERATION FILTER:
+        // If it is NOT approved, and the current user is NOT the owner, hide it.
+        if (status != 'approved' && !isOwner) {
+          return;
+        }
+
+        // UX: Pending pins are orange, approved are red.
+        final pinColor = status == 'pending' ? Colors.orange : Colors.red;
+
+        markers.add(
+          Marker(
+            point: LatLng(lat, lng),
+            width: 80,
+            height: 80,
+            child: GestureDetector(
+              onTap: () async {
+                if (!mounted) return;
+
+                final action = await showDialog<String>(
+                  context: context,
+                  builder: (context) => SimpleDialog(
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SimpleDialogOption(
-                          onPressed: () => Navigator.pop(context, 'viewInfo'),
-                          child: const Text('View sighting details', style: TextStyle(fontSize: 16)),
-                        ),
-                        SimpleDialogOption(
-                          onPressed: () => Navigator.pop(context, 'viewFish'),
-                          child: const Text('View fish information page', style: TextStyle(fontSize: 16)),
+                        Text(fishName,
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(
+                          status == 'pending'
+                              ? 'Status: Pending Moderator Approval'
+                              : 'User-submitted sighting. May not be scientifically verified.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: status == 'pending' ? Colors.orange[700] : Colors.grey[700],
+                            fontStyle: FontStyle.italic,
+                            fontWeight: status == 'pending' ? FontWeight.bold : FontWeight.normal,
+                          ),
                         ),
                       ],
                     ),
-                  );
+                    children: [
+                      SimpleDialogOption(
+                        onPressed: () => Navigator.pop(context, 'viewInfo'),
+                        child: const Text('View sighting details', style: TextStyle(fontSize: 16)),
+                      ),
+                      SimpleDialogOption(
+                        onPressed: () => Navigator.pop(context, 'viewFish'),
+                        child: const Text('View fish information page', style: TextStyle(fontSize: 16)),
+                      ),
+                    ],
+                  ),
+                );
 
-                  if (action == 'viewFish') {
-                    if (fishId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('This sighting is not linked to a fish.')),
-                      );
-                      return;
-                    }
-                    final fishSnap = await _db.child('fish').child(fishId).get();
-                    if (fishSnap.exists && fishSnap.value != null) {
-                      final fishData = Map<dynamic, dynamic>.from(fishSnap.value as Map<dynamic, dynamic>);
-                      if (mounted) {
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (context) => FishDetailPage(fish: fishData),
-                        ));
-                      }
-                    } else {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Fish details not found.')),
-                        );
-                      }
-                    }
+                if (action == 'viewFish') {
+                  if (fishId.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('This sighting is not linked to a fish.')),
+                    );
                     return;
                   }
+                  final fishSnap = await _db.child('fish').child(fishId).get();
+                  if (fishSnap.exists && fishSnap.value != null) {
+                    final fishData = Map<dynamic, dynamic>.from(fishSnap.value as Map<dynamic, dynamic>);
+                    if (mounted) {
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (context) => FishDetailPage(fish: fishData),
+                      ));
+                    }
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Fish details not found.')),
+                      );
+                    }
+                  }
+                  return;
+                }
 
-                  if (action == 'viewInfo' && mounted) {
-                    showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      builder: (context) => SafeArea(
-                        minimum: const EdgeInsets.only(bottom: 8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(fishName,
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 6),
+                if (action == 'viewInfo' && mounted) {
+                  showModalBottomSheet(
+                    context: context,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    builder: (context) => SafeArea(
+                      minimum: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(fishName,
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 6),
 
-                              // SECURE: show display name, not UID
-                              Row(
-                                children: [
-                                  const Icon(Icons.person_outline, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isOwner ? 'Submitted by you' : 'Submitted by $displayName',
-                                    style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-
-                              // Show only approximate area, not exact coords
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Near ${lat.toStringAsFixed(2)}°, ${lng.toStringAsFixed(2)}°',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-
-                              if (notes.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                const Text('Notes:', style: TextStyle(fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                Text(notes, style: const TextStyle(fontSize: 15)),
-                              ],
-
-                              const SizedBox(height: 12),
-                              if (isOwner)
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    onPressed: () async {
-                                      Navigator.pop(context);
-                                      await _db.child('user_sightings_temp').child(key.toString()).remove();
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Sighting deleted')),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 22),
-                                    label: const Text('Delete this pin',
-                                        style: TextStyle(color: Colors.red, fontSize: 14)),
-                                  ),
-                                )
-                              else if (status == 'approved') // Only show on public pins
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    onPressed: () async {
-                                      Navigator.pop(context);
-                                      // Flag the sighting in the database
-                                      await _db.child('user_sightings_temp').child(key.toString()).update({'isReported': true});
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Sighting reported to moderators.'),
-                                            backgroundColor: Colors.orange,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.flag, color: Colors.orange, size: 22),
-                                    label: const Text('Report inaccurate pin',
-                                        style: TextStyle(color: Colors.orange, fontSize: 14)),
-                                  ),
+                            // SECURE: show display name, not UID
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isOwner ? 'Submitted by you' : 'Submitted by $displayName',
+                                  style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Show only approximate area, not exact coords
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Near ${lat.toStringAsFixed(2)}°, ${lng.toStringAsFixed(2)}°',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ],
+                            ),
+
+                            if (notes.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              const Text('Notes:', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              Text(notes, style: const TextStyle(fontSize: 15)),
                             ],
-                          ),
+
+                            const SizedBox(height: 12),
+                            if (isOwner)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    await _db.child('user_sightings_temp').child(key.toString()).remove();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Sighting deleted')),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                                  label: const Text('Delete this pin',
+                                      style: TextStyle(color: Colors.red, fontSize: 14)),
+                                ),
+                              )
+                            else if (status == 'approved') // Only show on public pins
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    // Flag the sighting in the database
+                                    await _db.child('user_sightings_temp').child(key.toString()).update({'isReported': true});
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Sighting reported to moderators.'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.flag, color: Colors.orange, size: 22),
+                                  label: const Text('Report inaccurate pin',
+                                      style: TextStyle(color: Colors.orange, fontSize: 14)),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    );
-                  }
-                },
-                child: Column(
-                  children: [
-                    Icon(Icons.location_on, color: pinColor, size: 40),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white70,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        fishName,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ),
-                  ],
-                ),
+                  );
+                }
+              },
+              child: Column(
+                children: [
+                  Icon(Icons.location_on, color: pinColor, size: 40),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      fishName,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-          );
-        });
-      }
+          ),
+        );
+      });
+    }
 
+    if (mounted) {
       setState(() { _markers..clear()..addAll(markers); });
-    });
+    }
   }
 
   /// Gets GPS location then opens the add sighting dialog
