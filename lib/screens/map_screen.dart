@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -29,12 +31,20 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLocating = false;
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   late MapController _mapController;
+  StreamSubscription<DatabaseEvent>? _specificFishSub;
+  bool _specificFishActive = true;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
     _loadFishLocations();
+  }
+
+  @override
+  void dispose() {
+    _specificFishSub?.cancel();
+    super.dispose();
   }
 
   /// Requests permission, fetches GPS, adds a pin and flies to it.
@@ -124,14 +134,27 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _loadFishLocations() {
+  Future<void> _loadFishLocations() async {
     if (widget.fishId != null) {
+      _specificFishSub = _db.child('fish').child(widget.fishId!).onValue.listen((event) {
+        final bool exists = event.snapshot.exists && event.snapshot.value != null;
+        if (!mounted) return;
+        setState(() {
+          _specificFishActive = exists;
+          if (!exists) markers = [];
+        });
+      });
+
       _db
           .child('map')
           .orderByChild('fishId')
           .equalTo(widget.fishId)
           .onValue
           .listen((event) {
+        if (!_specificFishActive) {
+          if (mounted) setState(() => markers = []);
+          return;
+        }
         if (!event.snapshot.exists || event.snapshot.value == null) {
           setState(() => markers = []);
           return;
