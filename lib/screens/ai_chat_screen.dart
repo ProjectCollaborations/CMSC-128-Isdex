@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -24,6 +25,59 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
   bool _isAITyping = false;
+
+  // Track input line count for dynamic expansion
+  int _lineCount = 1;
+  static const int _maxLines = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add keyboard listeners
+    _focusNode.addListener(_onFocusChange);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+  }
+
+  void _onFocusChange() {
+    if (_focusNode.hasFocus) {
+      _scrollToBottomWithDelay();
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _scrollToBottomWithDelay() {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _updateLineCount(String text) {
+    final lines = text.split('\n').length;
+    final newLineCount = lines.clamp(1, _maxLines);
+    if (newLineCount != _lineCount) {
+      setState(() {
+        _lineCount = newLineCount;
+      });
+      _scrollToBottomWithDelay();
+    }
+  }
 
   Future<void> _clearChat() async {
     if (_userId.isEmpty) return;
@@ -67,7 +121,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    // Prevent sending while AI is already typing
     if (text.isEmpty || _userId.isEmpty || _isAITyping) return;
 
     final apiKey = dotenv.env['GEMINI_API_KEY'];
@@ -82,6 +135,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
 
     _messageController.clear();
+    setState(() {
+      _lineCount = 1;
+    });
     final timestamp = DateTime.now().millisecondsSinceEpoch;
 
     try {
@@ -89,7 +145,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _isAITyping = true;
       });
 
-      // Adds user's message to RTDB
       final newMessageRef = _db.child('chat_sessions/$_userId').push();
       await newMessageRef.set({
         'role': 'user',
@@ -97,14 +152,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
         'timestamp': timestamp,
       });
 
-      // Fetch Fish List for RAG (Retrieval-Augmented Generation)
       final fishSnap = await _db.child('fish').get();
       final allFish = fishSnap.value as Map? ?? {};
 
       String relevantContext = "";
       int matchCount = 0;
       allFish.forEach((id, fishData) {
-        // Limit context to top 3 matches to save tokens and prevent bloat
         if (matchCount >= 3) return;
 
         final fish = Map<String, dynamic>.from(fishData as Map);
@@ -118,13 +171,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
         }
       });
 
-      // Fetch Chat History (Last 5 messages for context)
       final historySnap = await _db.child('chat_sessions/$_userId').limitToLast(6).get();
       final historyData = historySnap.value as Map? ?? {};
       final historyList = historyData.entries.toList()
         ..sort((a, b) => (a.value['timestamp'] as int).compareTo(b.value['timestamp'] as int));
 
-      // Filter out the current message to avoid duplication in history
       final filteredHistory = historyList.where((e) => e.key != newMessageRef.key).toList();
 
       final List<Content> contentHistory = [];
@@ -132,18 +183,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
       for (var m in filteredHistory) {
         final role = m.value['role'] == 'user' ? 'user' : 'model';
-        // Only add if it alternates roles, to prevent Gemini API crashes
         if (role != lastRole) {
           contentHistory.add(Content(role, [TextPart(m.value['content'])]));
           lastRole = role;
         }
       }
 
-      // Initialize Gemini Model with Security Enhancements
       final model = GenerativeModel(
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-1.5-flash',
         apiKey: apiKey,
-        // Explicit Safety Settings
         safetySettings: [
           SafetySetting(HarmCategory.harassment, HarmBlockThreshold.medium),
           SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.medium),
@@ -160,17 +208,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ),
       );
 
-      // Query Gemini
       final chat = model.startChat(history: contentHistory);
       final response = await chat.sendMessage(Content.text(text));
       final responseText = response.text ?? "I'm sorry, I couldn't generate a response.";
 
-      // Save AI's response to RTDB
       await _db.child('chat_sessions/$_userId').push().set({
         'role': 'model',
         'content': responseText,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
+
+      _scrollToBottom();
 
     } catch (e) {
       if (mounted) {
@@ -192,14 +240,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
         setState(() {
           _isAITyping = false;
         });
+        _scrollToBottom();
       }
     }
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
     _messageController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -210,6 +261,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     return Scaffold(
       backgroundColor: kBackground,
+      resizeToAvoidBottomInset: true, // This helps with keyboard handling
       appBar: AppBar(
         title: const Text(
           'Isdex AI Assistant',
@@ -227,127 +279,149 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting Section
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-            child: Text(
-              'Hi, ${userName[0].toUpperCase()}${userName.substring(1)}!',
-              style: const TextStyle(
-                color: kDarkNavy,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Chat Flow - Expanded to fill available space
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: StreamBuilder(
+                  stream: _db.child('chat_sessions/$_userId').onValue,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: kAccentBlue));
+                    }
 
-          // Shortcut Buttons Row
-          _buildShortcutsRow(),
-
-          const SizedBox(height: 16),
-
-          // Chat Flow
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: StreamBuilder(
-                stream: _db.child('chat_sessions/$_userId').onValue,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: kAccentBlue));
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-                    return Center(
+                    // Build header (greeting + shortcuts) as a sliver so it
+                    // scrolls away naturally when the keyboard appears.
+                    final header = SliverToBoxAdapter(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.auto_awesome,
-                            size: 64,
-                            color: kAccentBlue.withValues(alpha: 0.2),
+                          // Greeting Section
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                            child: Text(
+                              'Hi, ${userName[0].toUpperCase()}${userName.substring(1)}!',
+                              style: const TextStyle(
+                                color: kDarkNavy,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
                           ),
+                          // Shortcut Buttons Row
+                          _buildShortcutsRow(),
                           const SizedBox(height: 16),
-                          const Text(
-                            'Ask me anything about Philippine fish!',
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
-                          ),
                         ],
                       ),
                     );
-                  }
 
-                  final data = Map<dynamic, dynamic>.from(
-                    snapshot.data!.snapshot.value as Map,
-                  );
-                  final messages = data.entries.toList()
-                    ..sort(
-                      (a, b) => b.value['timestamp'].compareTo(a.value['timestamp']),
+                    if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+                      return CustomScrollView(
+                        controller: _scrollController,
+                        slivers: [
+                          header,
+                          SliverFillRemaining(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    size: 64,
+                                    color: kAccentBlue.withValues(alpha: 0.2),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Ask me anything about Philippine fish!',
+                                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final data = Map<dynamic, dynamic>.from(
+                      snapshot.data!.snapshot.value as Map,
                     );
-
-                  return ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 24,
-                    ),
-                    reverse: true,
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = messages[index].value;
-                      final isUser = msg['role'] == 'user';
-                      final content = msg['content'] as String;
-                      final ts = msg['timestamp'] as int;
-                      final timeStr = DateFormat('jm').format(
-                        DateTime.fromMillisecondsSinceEpoch(ts),
+                    final messages = data.entries.toList()
+                      ..sort(
+                        (a, b) => b.value['timestamp'].compareTo(a.value['timestamp']),
                       );
 
-                      return _buildMessageBubble(content, isUser, timeStr);
-                    },
-                  );
-                },
+                    // Once there are messages, show them in a reverse list
+                    // (newest at bottom). The header is intentionally hidden
+                    // once conversation starts to maximise chat space.
+                    return ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 24,
+                      ),
+                      reverse: true,
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index].value;
+                        final isUser = msg['role'] == 'user';
+                        final content = msg['content'] as String;
+                        final ts = msg['timestamp'] as int;
+                        final timeStr = DateFormat('jm').format(
+                          DateTime.fromMillisecondsSinceEpoch(ts),
+                        );
+
+                        return _buildMessageBubble(content, isUser, timeStr);
+                      },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-          
-          if (_isAITyping)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.only(left: 24, bottom: 8),
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: kAccentBlue),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'AI is thinking...',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
+            
+            // AI Typing Indicator
+            if (_isAITyping)
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.only(left: 24, bottom: 8, top: 4),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: kAccentBlue),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    const Text(
+                      'AI is thinking...',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          _buildInputArea(),
-        ],
+              
+            // Input Area - Properly positioned
+            _buildInputArea(),
+          ],
+        ),
       ),
     );
   }
@@ -391,6 +465,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       case 'Identify Fish':
         setState(() {
           _messageController.text = "I want to identify a fish. Here are the details:\n- Size: \n- Color: \n- Location seen: ";
+          _updateLineCount(_messageController.text);
         });
         _focusNode.requestFocus();
         break;
@@ -466,14 +541,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
         color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Colors.grey.withValues(alpha: 0.15),
+            width: 1,
+          ),
+        ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Expandable text field
           Expanded(
             child: Container(
+              constraints: const BoxConstraints(
+                minHeight: 44,
+                maxHeight: 96, // ~3 lines of text
+              ),
               decoration: BoxDecoration(
                 color: kBackground,
                 borderRadius: BorderRadius.circular(28),
@@ -484,6 +571,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 focusNode: _focusNode,
                 textCapitalization: TextCapitalization.sentences,
                 enabled: !_isAITyping,
+                maxLines: _lineCount,
+                minLines: 1,
                 style: const TextStyle(color: kDarkNavy),
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
@@ -494,28 +583,35 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     vertical: 12,
                   ),
                 ),
+                onChanged: (text) {
+                  _updateLineCount(text);
+                },
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          GestureDetector(
-            onTap: _isAITyping ? null : _sendMessage,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _isAITyping ? Colors.grey.withValues(alpha: 0.2) : kAccentBlue,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  if (!_isAITyping)
-                    BoxShadow(
-                      color: kAccentBlue.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                ],
+          // Send button aligned at bottom
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: GestureDetector(
+              onTap: _isAITyping ? null : _sendMessage,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _isAITyping ? Colors.grey.withValues(alpha: 0.2) : kAccentBlue,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    if (!_isAITyping)
+                      BoxShadow(
+                        color: kAccentBlue.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                  ],
+                ),
+                child: const Icon(Icons.send_rounded, color: Colors.white, size: 24),
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 24),
             ),
           ),
         ],
