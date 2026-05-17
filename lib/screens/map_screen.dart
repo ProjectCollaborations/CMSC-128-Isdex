@@ -1,10 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+
+import '../viewmodels/map_viewmodel.dart';
+import '../data/models/fish.dart';
 import 'fish_detail_page.dart';
 
 class MapScreen extends StatefulWidget {
@@ -26,40 +27,206 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  List<Marker> markers = [];
+  late MapController _mapController;
+  late MapViewModel _mapViewModel;
+  
+  List<Marker> _markers = [];
   Marker? _myLocationMarker;
   bool _isLocating = false;
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  late MapController _mapController;
-  StreamSubscription<DatabaseEvent>? _specificFishSub;
-  bool _specificFishActive = true;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
-    _loadFishLocations();
   }
 
   @override
-  void dispose() {
-    _specificFishSub?.cancel();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      _mapViewModel = context.read<MapViewModel>();
+      _setupListeners();
+      _isInitialized = true;
+    }
   }
 
-  /// Requests permission, fetches GPS, adds a pin and flies to it.
+  void _setupListeners() {
+    if (widget.fishId != null) {
+      // Show only locations for a specific fish
+      _mapViewModel.watchLocationsForFish(widget.fishId!).listen((locations) {
+        _rebuildMarkersForLocations(locations);
+      });
+    } else if (widget.latitude != null && widget.longitude != null) {
+      // Show a single location pin
+      _showSingleLocationMarker();
+    } else {
+      // Show all fish locations
+      _mapViewModel.addListener(_rebuildAllMarkers);
+      _rebuildAllMarkers();
+    }
+  }
+
+  void _rebuildAllMarkers() {
+    final fishLocations = _mapViewModel.fishLocations;
+    final userSightingLocations = _mapViewModel.userSightingLocations;
+    
+    final List<Marker> markers = [];
+    
+    // Add fish reference locations
+    for (final location in fishLocations) {
+      markers.add(_buildMarker(
+        coordinates: location.coordinates,
+        fishId: location.fishId,
+        fishName: location.fishName,
+        region: location.region,
+        isUserSighting: false,
+      ));
+    }
+    
+    // Add user sighting locations (approved only)
+    for (final location in userSightingLocations) {
+      markers.add(_buildMarker(
+        coordinates: location.coordinates,
+        fishId: location.fishId,
+        fishName: location.fishName,
+        region: location.region,
+        isUserSighting: true,
+      ));
+    }
+    
+    setState(() {
+      _markers = markers;
+    });
+  }
+
+  void _rebuildMarkersForLocations(List<MapLocation> locations) {
+    final markers = locations.map((location) => _buildMarker(
+      coordinates: location.coordinates,
+      fishId: location.fishId,
+      fishName: location.fishName.isNotEmpty ? location.fishName : widget.fishName ?? 'Fish',
+      region: location.region,
+      isUserSighting: false,
+    )).toList();
+    
+    setState(() {
+      _markers = markers;
+    });
+  }
+
+  void _showSingleLocationMarker() {
+    final marker = Marker(
+      point: LatLng(widget.latitude!, widget.longitude!),
+      width: 80,
+      height: 80,
+      child: Column(
+        children: [
+          const Icon(Icons.location_on, color: Colors.red, size: 50),
+          if (widget.fishName != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Text(
+                widget.fishName!,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
+    );
+    
+    setState(() {
+      _markers = [marker];
+    });
+  }
+
+  Marker _buildMarker({
+    required LatLng coordinates,
+    required String fishId,
+    required String fishName,
+    required String region,
+    required bool isUserSighting,
+  }) {
+    return Marker(
+      point: coordinates,
+      width: 80,
+      height: 80,
+      child: GestureDetector(
+        onTap: () async {
+          // Fetch full fish details
+          final fish = await _mapViewModel.getFishById(fishId);
+          if (fish != null && mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FishDetailPage(fish: fish),
+              ),
+            );
+          } else if (mounted) {
+            // Fallback: show region info
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  region.isNotEmpty 
+                      ? 'Reference location in $region' 
+                      : 'Reference location',
+                ),
+              ),
+            );
+          }
+        },
+        child: Column(
+          children: [
+            Icon(
+              Icons.location_on,
+              color: isUserSighting ? Colors.red : Colors.blue,
+              size: 40,
+            ),
+            if (fishName.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white70,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  fishName,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            if (region.isNotEmpty && fishName.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white70,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  region,
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _goToMyLocation() async {
     setState(() => _isLocating = true);
 
     try {
-      // 1. Check & request permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
+      if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -70,7 +237,6 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
 
-      // 2. Check if location service is enabled
       final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
@@ -81,14 +247,12 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
 
-      // 3. Get current position
       final Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
       final LatLng myLatLng = LatLng(position.latitude, position.longitude);
 
-      // 4. Build a distinct "my location" marker
       final Marker locationMarker = Marker(
         point: myLatLng,
         width: 80,
@@ -100,29 +264,24 @@ class _MapScreenState extends State<MapScreen> {
                 color: Colors.blue,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 6),
-                ],
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
               ),
               padding: const EdgeInsets.all(6),
               child: const Icon(Icons.my_location, color: Colors.white, size: 20),
             ),
             const Text(
               'You',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue),
             ),
           ],
         ),
       );
 
       setState(() => _myLocationMarker = locationMarker);
-
-      // 5. Animate map to the new location
       _mapController.move(myLatLng, 14.0);
+      
+      // Also update ViewModel
+      _mapViewModel.setUserLocation(myLatLng);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,184 +293,34 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<void> _loadFishLocations() async {
-    if (widget.fishId != null) {
-      _specificFishSub = _db.child('fish').child(widget.fishId!).onValue.listen((event) {
-        final bool exists = event.snapshot.exists && event.snapshot.value != null;
-        if (!mounted) return;
-        setState(() {
-          _specificFishActive = exists;
-          if (!exists) markers = [];
-        });
-      });
-
-      _db
-          .child('map')
-          .orderByChild('fishId')
-          .equalTo(widget.fishId)
-          .onValue
-          .listen((event) {
-        if (!_specificFishActive) {
-          if (mounted) setState(() => markers = []);
-          return;
-        }
-        if (!event.snapshot.exists || event.snapshot.value == null) {
-          setState(() => markers = []);
-          return;
-        }
-
-        final Map<dynamic, dynamic> locationsMap =
-            event.snapshot.value as Map<dynamic, dynamic>;
-        final List<Marker> newMarkers = [];
-
-        locationsMap.forEach((locationId, locationData) {
-          final data = locationData as Map<dynamic, dynamic>;
-          final double lat = (data['latitude'] as num?)?.toDouble() ?? 12.8797;
-          final double lng = (data['longitude'] as num?)?.toDouble() ?? 121.7740;
-          final String region = data['region'] ?? 'Unknown';
-
-          newMarkers.add(
-            Marker(
-              point: LatLng(lat, lng),
-              width: 80,
-              height: 80,
-              child: GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        region.isNotEmpty ? 'Sightings in $region' : 'Sightings location',
-                      ),
-                    ),
-                  );
-                },
-                child: Column(
-                  children: [
-                    const Icon(Icons.location_on, color: Colors.red, size: 40),
-                    if (region.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        child: Text(
-                          region,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        });
-
-        setState(() => markers = newMarkers);
-      });
-      return;
+  @override
+  void dispose() {
+    if (widget.fishId == null && widget.latitude == null) {
+      _mapViewModel.removeListener(_rebuildAllMarkers);
     }
-
-    if (widget.latitude != null && widget.longitude != null) {
-      setState(() {
-        markers = [
-          Marker(
-            point: LatLng(widget.latitude!, widget.longitude!),
-            width: 80,
-            height: 80,
-            child: Column(
-              children: [
-                const Icon(Icons.location_on, color: Colors.red, size: 50),
-                if (widget.fishName != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Text(
-                      widget.fishName!,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ];
-      });
-      return;
-    }
-
-    _db.child('map').onValue.listen((event) {
-      final List<Marker> newMarkers = [];
-
-      if (event.snapshot.exists && event.snapshot.value != null) {
-        final Map<dynamic, dynamic> locationsMap =
-            event.snapshot.value as Map<dynamic, dynamic>;
-
-        locationsMap.forEach((locationId, locationData) {
-          final data = locationData as Map<dynamic, dynamic>;
-          final double latitude = (data['latitude'] as num?)?.toDouble() ?? 12.8797;
-          final double longitude = (data['longitude'] as num?)?.toDouble() ?? 121.7740;
-          final String fishId = data['fishId'] ?? 'unknown';
-
-          _db.child('fish').child(fishId).once().then((fishSnapshot) {
-            if (fishSnapshot.snapshot.exists && fishSnapshot.snapshot.value != null) {
-              final Map<dynamic, dynamic> fishData =
-                  fishSnapshot.snapshot.value as Map<dynamic, dynamic>;
-
-              final marker = Marker(
-                point: LatLng(latitude, longitude),
-                width: 80,
-                height: 80,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: '/fishDetail'),
-                        builder: (context) => FishDetailPage(fish: fishData),
-                      ),
-                    );
-                  },
-                  child: Column(
-                    children: [
-                      const Icon(Icons.location_on, color: Colors.blue, size: 40),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        child: Text(
-                          fishData['commonName']?.toString() ?? 'Fish',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-
-              setState(() {
-                newMarkers.add(marker);
-                markers = List<Marker>.from(newMarkers);
-              });
-            }
-          });
-        });
-      }
-    });
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final LatLng initialCenter = markers.isNotEmpty
-        ? markers.first.point
-        : (widget.latitude != null && widget.longitude != null
-            ? LatLng(widget.latitude!, widget.longitude!)
-            : const LatLng(12.8797, 121.7740));
+    // Determine initial center
+    LatLng initialCenter;
+    double initialZoom;
 
-    final double initialZoom =
-        widget.fishId != null ? 8.0 : (widget.latitude != null ? 12.0 : 6.0);
+    if (_markers.isNotEmpty) {
+      initialCenter = _markers.first.point;
+      initialZoom = 8.0;
+    } else if (widget.latitude != null && widget.longitude != null) {
+      initialCenter = LatLng(widget.latitude!, widget.longitude!);
+      initialZoom = 12.0;
+    } else {
+      initialCenter = const LatLng(12.8797, 121.7740); // Center of Philippines
+      initialZoom = 6.0;
+    }
 
-    // Combine fish markers + optional "my location" marker
+    // Combine all markers
     final allMarkers = [
-      ...markers,
+      ..._markers,
       if (_myLocationMarker != null) _myLocationMarker!,
     ];
 
@@ -321,20 +330,38 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
-      body: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: initialCenter,
-          initialZoom: initialZoom,
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.isdex',
-          ),
-          MarkerLayer(markers: allMarkers),
-        ],
-      ),
+      body: _mapViewModel.isLoadingLocations && _markers.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _mapViewModel.error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(_mapViewModel.error!),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => _mapViewModel.clearError(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: initialCenter,
+                    initialZoom: initialZoom,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.isdex',
+                    ),
+                    MarkerLayer(markers: allMarkers),
+                  ],
+                ),
       floatingActionButton: FloatingActionButton(
         onPressed: _isLocating ? null : _goToMyLocation,
         backgroundColor: Colors.blue,

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:path_provider/path_provider.dart';
 import 'fish_detail_page.dart';
+import '../data/models/fish.dart';
 
 class FishImageSearch extends StatefulWidget {
   final List<Map<dynamic, dynamic>> allSpecies;
@@ -67,10 +68,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
 
   Future<void> _recognizeFishWithMLKit(File imageFile) async {
     try {
-      // Create InputImage from file - this is more reliable
       final inputImage = InputImage.fromFile(imageFile);
-      
-      // Process the image with ML Kit
       final List<ImageLabel> labels = await _imageLabeler.processImage(inputImage);
       
       if (labels.isEmpty) {
@@ -83,7 +81,6 @@ class _FishImageSearchState extends State<FishImageSearch> {
         return;
       }
 
-      // Extract detected labels
       List<String> detectedLabels = [];
       for (ImageLabel label in labels) {
         if (label.confidence > 0.5) {
@@ -92,10 +89,8 @@ class _FishImageSearchState extends State<FishImageSearch> {
         }
       }
 
-      // Remove duplicates
       detectedLabels = detectedLabels.toSet().toList();
 
-      // Also add fish-related keywords to help with matching
       final fishKeywords = ['fish', 'marine', 'sea', 'aquatic', 'swimming'];
       for (var keyword in fishKeywords) {
         if (!detectedLabels.contains(keyword)) {
@@ -146,7 +141,6 @@ class _FishImageSearchState extends State<FishImageSearch> {
       }
     }
     
-    // Sort matches by relevance
     var matches = uniqueMatches.toList();
     matches.sort((a, b) {
       int scoreA = 0;
@@ -210,11 +204,24 @@ class _FishImageSearchState extends State<FishImageSearch> {
     });
   }
 
-  void _navigateToFishDetail(Map<dynamic, dynamic> fish) {
+  /// Convert the raw Map from the database to a proper Fish model
+  Fish _convertToFishModel(Map<dynamic, dynamic> fishData) {
+    // Determine the key - either 'key' field or fishId
+    final String key = fishData.containsKey('key') 
+        ? fishData['key'].toString() 
+        : fishData['fishId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+    
+    return Fish.fromSnapshot(key, fishData);
+  }
+
+  void _navigateToFishDetail(Map<dynamic, dynamic> fishData) {
+    // Convert to Fish model before navigating
+    final fishModel = _convertToFishModel(fishData);
+    
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FishDetailPage(fish: fish),
+        builder: (context) => FishDetailPage(fish: fishModel),
       ),
     );
   }
@@ -504,7 +511,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _matchedFish.length,
                       itemBuilder: (context, i) {
-                        final fish = _matchedFish[i];
+                        final fishData = _matchedFish[i];
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           elevation: 2,
@@ -512,7 +519,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: InkWell(
-                            onTap: () => _navigateToFishDetail(fish),
+                            onTap: () => _navigateToFishDetail(fishData),
                             borderRadius: BorderRadius.circular(12),
                             child: Padding(
                               padding: const EdgeInsets.all(12),
@@ -525,12 +532,12 @@ class _FishImageSearchState extends State<FishImageSearch> {
                                       color: Colors.blue[50],
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: (fish['imageUrl'] != null && 
-                                            fish['imageUrl'].toString().isNotEmpty)
+                                    child: (fishData['imageUrl'] != null && 
+                                            fishData['imageUrl'].toString().isNotEmpty)
                                         ? ClipRRect(
                                             borderRadius: BorderRadius.circular(10),
                                             child: Image.asset(
-                                              fish['imageUrl'],
+                                              fishData['imageUrl'],
                                               width: 60,
                                               height: 60,
                                               fit: BoxFit.cover,
@@ -553,7 +560,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          fish['commonName'] ?? 'Unknown',
+                                          fishData['commonName'] ?? 'Unknown',
                                           style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
@@ -561,7 +568,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          fish['scientificName'] ?? '',
+                                          fishData['scientificName'] ?? '',
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontStyle: FontStyle.italic,
@@ -579,7 +586,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
                                             borderRadius: BorderRadius.circular(10),
                                           ),
                                           child: Text(
-                                            fish['habitat'] ?? 'Unknown',
+                                            fishData['habitat'] ?? 'Unknown',
                                             style: TextStyle(
                                               fontSize: 10,
                                               color: Colors.blue[800],

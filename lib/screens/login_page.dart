@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'theme.dart';
 import 'signup_page.dart';
-import '../services/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../viewmodels/auth_viewmodel.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,43 +12,40 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleLogin() async {
-    if (_emailController.text.trim().isEmpty) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty) {
       _showError('Please enter your email');
       return;
     }
 
-    if (_passwordController.text.trim().isEmpty) {
+    if (password.isEmpty) {
       _showError('Please enter your password');
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authVm = context.read<AuthViewModel>();
+    final success = await authVm.signIn(email, password);
 
-    try {
-      await _authService.signInWithEmail(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
-
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logged in successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      _showError(_getErrorMessage(e.toString()));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (success && mounted) {
+      // AuthGate will handle navigation based on role
+      // Just close any modal sheets if open
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else if (mounted && authVm.error != null) {
+      _showError(authVm.error!);
+      authVm.clearError();
     }
   }
 
@@ -66,60 +63,27 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authVm = context.read<AuthViewModel>();
+    final exists = await authVm.isEmailRegistered(email);
+    
+    if (!exists) {
+      _showError('No account found with this email.');
+      return;
+    }
 
-    try {
-      final exists = await _authService.isEmailRegisteredInAppDb(email);
-      if (!exists) {
-        _showError('No account found with this email.');
-        return;
-      }
+    final success = await authVm.resetPassword(email);
 
-      await _authService.resetPassword(email);
-
-      if (!mounted) return;
+    if (mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password reset email sent! Check your inbox.'),
           backgroundColor: Colors.green,
         ),
       );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-
-      final msg = switch (e.code) {
-        'invalid-email' => 'Invalid email address',
-        'too-many-requests' => 'Too many attempts. Try again later.',
-        'network-request-failed' => 'Network error. Check your connection.',
-        _ => 'Failed to send reset email. Please try again.',
-      };
-
-      _showError(msg);
-    } catch (_) {
-      if (!mounted) return;
-      _showError('Failed to send reset email. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } else if (mounted && authVm.error != null) {
+      _showError(authVm.error!);
+      authVm.clearError();
     }
-  }
-
-  String _getErrorMessage(String error) {
-    if (error.contains('user-not-found')) {
-      return 'No account found with this email';
-    } else if (error.contains('wrong-password')) {
-      return 'Incorrect password';
-    } else if (error.contains('invalid-email')) {
-      return 'Invalid email address';
-    } else if (error.contains('user-disabled')) {
-      return 'This account has been disabled';
-    } else if (error.contains('too-many-requests')) {
-      return 'Too many failed attempts. Try again later';
-    } else if (error.contains('network-request-failed')) {
-      return 'Network error. Please check your connection';
-    } else if (error.contains('invalid-credential')) {
-      return 'Invalid email or password';
-    }
-    return 'Login failed. Please try again';
   }
 
   void _showError(String message) {
@@ -132,14 +96,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final authVm = context.watch<AuthViewModel>();
+
     return Scaffold(
       backgroundColor: kBackground,
       body: SafeArea(
@@ -181,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
                                   width: 40,
                                 ),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
                                 'IsDex',
                                 style: TextStyle(
@@ -263,7 +222,7 @@ class _LoginPageState extends State<LoginPage> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleLogin,
+                              onPressed: authVm.isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: kAccentBlue,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -271,7 +230,7 @@ class _LoginPageState extends State<LoginPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: _isLoading
+                              child: authVm.isLoading
                                   ? const SizedBox(
                                       height: 20,
                                       width: 20,
@@ -297,7 +256,7 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: _handleForgotPassword,
+                            onPressed: authVm.isLoading ? null : _handleForgotPassword,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: kDarkNavy,
                               side: const BorderSide(color: kDarkNavy),
@@ -312,14 +271,16 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SignUpPage(),
-                                ),
-                              );
-                            },
+                            onPressed: authVm.isLoading
+                                ? null
+                                : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const SignUpPage(),
+                                      ),
+                                    );
+                                  },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: kDarkNavy,
                               side: const BorderSide(color: kDarkNavy),

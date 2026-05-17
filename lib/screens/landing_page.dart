@@ -1,13 +1,18 @@
+// lib/screens/landing_page.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'map_screen.dart';
-import 'community_page.dart';  // Add this import
+import 'package:isdex/screens/community_page.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../viewmodels/fish_catalog_viewmodel.dart';
+import '../viewmodels/auth_viewmodel.dart';
 import 'fish_detail_page.dart';
 import 'login_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'map_screen.dart';
 import 'user_sightings_map_screen.dart';
 import 'ai_chat_screen.dart';
-import 'fish_image_search.dart';
+import '../services/database_init_service.dart';
+import '../data/models/fish.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -16,150 +21,77 @@ class LandingPage extends StatefulWidget {
   State<LandingPage> createState() => _LandingPageState();
 }
 
-
-class _LandingPageState extends State<LandingPage> {  
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  List<Map<dynamic, dynamic>> filteredSpecies = [];
-  List<Map<dynamic, dynamic>> allSpecies = [];
-  TextEditingController searchController = TextEditingController();
-  String selectedHabitat = 'All';
-  List<String> habitats = ['All', 'Saltwater', 'Freshwater', 'Brackish Water'];
+class _LandingPageState extends State<LandingPage> {
+  final TextEditingController _searchController = TextEditingController();
+  final DatabaseInitService _dbInitService = DatabaseInitService();
 
   @override
   void initState() {
     super.initState();
-    _loadSpecies();
-    searchController.addListener(_filterSpecies);
+    _initializeData();
   }
 
-  void _loadSpecies() {
-  final fishRef = _db.child('fish');
-
-  // Keep this path fresh in the local cache
-  fishRef.keepSynced(true);
-
-  fishRef.onValue.listen((event) {
-    List<Map<dynamic, dynamic>> species = [];
-
-    if (event.snapshot.exists && event.snapshot.value != null) {
-      final speciesMap = event.snapshot.value as Map<dynamic, dynamic>;
-      speciesMap.forEach((key, value) {
-        species.add(Map<dynamic, dynamic>.from(value));
-      });
-    }
-
-    setState(() {
-      allSpecies = species;
-      _filterSpecies();
-      });
-    });
+  Future<void> _initializeData() async {
+    await _dbInitService.initializeAllData();
   }
 
-  void _filterSpecies() {
-    String searchText = searchController.text.toLowerCase();
-    setState(() {
-      filteredSpecies = allSpecies.where((fish) {
-        bool matchesSearch = fish['commonName']
-                .toString()
-                .toLowerCase()
-                .contains(searchText) ||
-            fish['localName']
-                .toString()
-                .toLowerCase()
-                .contains(searchText) ||
-            fish['scientificName']
-                .toString()
-                .toLowerCase()
-                .contains(searchText);
-
-        bool matchesHabitat = selectedHabitat == 'All' ||
-            fish['habitat'].toString() == selectedHabitat;
-
-        return matchesSearch && matchesHabitat;
-      }).toList();
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
-void _showFishDetails(Map<dynamic, dynamic> fish) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => FishDetailPage(fish: fish),
-    ),
-  );
-}
 
-
-  Widget _buildDetailItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ],
+  void _showUserMenu(BuildContext context, User user) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    );
-  }
-
-      void _showUserMenu() {
-      User? user = FirebaseAuth.instance.currentUser;
-
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (context) => SafeArea(
-          minimum: const EdgeInsets.only(bottom: 8),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.person, color: Colors.blue),
-                  title: Text(user?.email ?? 'User'),
-                  subtitle: const Text('Logged in'),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text('Sign Out'),
-                  onTap: () async {
-                    await FirebaseAuth.instance.signOut();
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person, color: Colors.blue),
+                title: Text(user.email ?? 'User'),
+                subtitle: const Text('Logged in'),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Sign Out'),
+                onTap: () async {
+                  final authVm = context.read<AuthViewModel>();
+                  await authVm.signOut();
+                  if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Signed out successfully')),
                     );
-                  },
-                ),
-              ],
-            ),
+                  }
+                },
+              ),
+            ],
           ),
         ),
-      );
-    }
-
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final fishVm = context.watch<FishCatalogViewModel>();
+    final authVm = context.watch<AuthViewModel>();
+    final user = authVm.currentUser;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Column(
           children: [
+            // Header
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(16),
@@ -187,303 +119,160 @@ void _showFishDetails(Map<dynamic, dynamic> fish) {
                           ),
                         ],
                       ),
-                      StreamBuilder<User?>(
-                        stream: FirebaseAuth.instance.authStateChanges(),
-                        builder: (context, snapshot) {
-                          User? user = snapshot.data;
-                          
-                          return ElevatedButton(
-                            onPressed: () {
-                              if (user == null) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                                );
-                              } else {
-                                _showUserMenu();
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue[100],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.person, color: Colors.blue),
-                                const SizedBox(width: 4),
-                                Text(
-                                  user == null 
-                                    ? 'Log in/Sign up' 
-                                    : user.email?.split('@')[0] ?? 'User',
-                                  style: const TextStyle(color: Colors.blue),
-                                ),
-                              ],
-                            ),
-                          );
+                      ElevatedButton(
+                        onPressed: () {
+                          if (user == null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LoginPage()),
+                            );
+                          } else {
+                            _showUserMenu(context, user);
+                          }
                         },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[100],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.person, color: Colors.blue),
+                            const SizedBox(width: 4),
+                            Text(
+                              user == null
+                                  ? 'Log in/Sign up'
+                                  : user.email?.split('@')[0] ?? 'User',
+                              style: const TextStyle(color: Colors.blue),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-Container(
-  decoration: BoxDecoration(
-    color: Colors.blue[50],
-    borderRadius: BorderRadius.circular(25),
-  ),
-          child: TextField(
-            controller: searchController,
-            decoration: InputDecoration(
-              hintText: 'Search Species',
-              border: InputBorder.none,
-              prefixIcon: const Icon(Icons.search, color: Colors.grey),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.camera_alt, color: Colors.blue),
-                tooltip: 'Search by photo',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => FishImageSearch(allSpecies: allSpecies),
+
+                  // Search bar
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(25),
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: habitats.map((habitat) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text(habitat),
-                                  selected: selectedHabitat == habitat,
-                                  onSelected: (selected) {
-                                    setState(() {
-                                      selectedHabitat = habitat;
-                                    });
-                                    _filterSpecies();
-                                  },
-                                  backgroundColor: Colors.white,
-                                  selectedColor: Colors.blue[100],
-                                  side: BorderSide(
-                                    color: selectedHabitat == habitat
-                                        ? Colors.blue
-                                        : Colors.grey[300]!,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (value) => fishVm.setSearchQuery(value),
+                      decoration: InputDecoration(
+                        hintText: 'Search Species',
+                        border: InputBorder.none,
+                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.camera_alt, color: Colors.blue),
+                          tooltip: 'Search by photo',
+                          onPressed: () {
+                            // TODO: Navigate to FishImageSearch with allSpecies
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Photo search coming soon')),
+                            );
+                          },
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Habitat filters
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: fishVm.habitats.map((habitat) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(habitat),
+                            selected: fishVm.selectedHabitat == habitat,
+                            onSelected: (_) => fishVm.setHabitat(habitat),
+                            backgroundColor: Colors.white,
+                            selectedColor: Colors.blue[100],
+                            side: BorderSide(
+                              color: fishVm.selectedHabitat == habitat
+                                  ? Colors.blue
+                                  : Colors.grey[300]!,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ],
               ),
             ),
+
+            // Fish list
             Expanded(
-              child: filteredSpecies.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No species found',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: filteredSpecies.length,
-                      itemBuilder: (context, index) {
-                        var fish = filteredSpecies[index];
-                        return GestureDetector(
-                          onTap: () => _showFishDetails(fish),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey[200]!,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: fish['imageUrl'] != null &&
-                                          fish['imageUrl'].toString().isNotEmpty
-                                      ? Image.asset(
-                                          fish['imageUrl'],
-                                          width: 50,
-                                          height: 50,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                            return Container(
-                                              width: 50,
-                                              height: 50,
-                                              color: Colors.grey[200],
-                                              child: Icon(
-                                                Icons.image_outlined,
-                                                size: 30,
-                                                color: Colors.grey[400],
-                                              ),
-                                            );
-                                          },
-                                        )
-                                      : Container(
-                                          width: 50,
-                                          height: 50,
-                                          color: Colors.grey[200],
-                                          child: Icon(
-                                            Icons.image_outlined,
-                                            size: 30,
-                                            color: Colors.grey[400],
-                                          ),
-                                        ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        fish['commonName'] ?? 'Unknown',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        fish['scientificName'] ?? '',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        fish['habitat'] ?? 'Unknown',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.blue,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(Icons.chevron_right,
-                                    color: Colors.grey[400]),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+              child: _buildBody(fishVm),
             ),
-            // CONDITIONAL BOTTOM NAVIGATION BAR
+
+            // Bottom navigation
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: StreamBuilder<User?>(
-                stream: FirebaseAuth.instance.authStateChanges(),
-                builder: (context, snapshot) {
-                  User? user = snapshot.data;
-                  bool isLoggedIn = user != null;
-                  
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Home Button (Always visible)
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.home, color: Colors.blue, size: 28),
-                      ),
-
-                      // Community Button (Only for logged-in users)
-                      if (isLoggedIn)
-                        IconButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const CommunityPage(),
-                              ),
-                            );
-                          },
-                          icon: Icon(Icons.people, color: Colors.grey[400], size: 28),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.home, color: Colors.blue, size: 28),
+                  ),
+                  if (user != null)
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CommunityPage()),
+                        );
+                      },
+                      icon: Icon(Icons.people, color: Colors.grey[400], size: 28),
+                    ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MapScreen()),
+                      );
+                    },
+                    icon: Icon(Icons.map, color: Colors.grey[400], size: 28),
+                    tooltip: 'Reference map',
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const UserSightingsMapScreen(),
                         ),
-
-                      // Dev-verified Map Button (Always visible)
-                      IconButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MapScreen(),
-                            ),
-                          );
-                        },
-                        icon: Icon(Icons.map, color: Colors.grey[400], size: 28),
-                        tooltip: 'Reference map',
-                      ),
-
-                      // User Sightings Map (View for guests, contribute when logged in)
-                      IconButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const UserSightingsMapScreen(),
-                            ),
-                          );
-                        },
-                        icon: Icon(
-                          Icons.location_on,
-                          color: isLoggedIn ? Colors.grey : Colors.grey[400],
-                          size: 28,
-                        ),
-                        tooltip: isLoggedIn ? 'User sightings (add & view)' : 'User sightings (view only)',
-                      ),
-
-                      // AI Assistant Button (Only for logged-in users)
-                      if (isLoggedIn)
-                        IconButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AiChatScreen(),
-                              ),
-                            );
-                          },
-                          icon: Icon(
-                            Icons.auto_awesome,
-                            color: Colors.grey[400],
-                            size: 28,
-                          ),
-                          tooltip: 'AI Assistant',
-                        ),
-                    ],
-                  );
-                },
+                      );
+                    },
+                    icon: Icon(
+                      Icons.location_on,
+                      color: user != null ? Colors.grey : Colors.grey[400],
+                      size: 28,
+                    ),
+                    tooltip: user != null ? 'User sightings' : 'User sightings (view only)',
+                  ),
+                  if (user != null)
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AiChatScreen()),
+                        );
+                      },
+                      icon: Icon(Icons.auto_awesome, color: Colors.grey[400], size: 28),
+                      tooltip: 'AI Assistant',
+                    ),
+                ],
               ),
             ),
           ],
@@ -492,9 +281,128 @@ Container(
     );
   }
 
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
+  Widget _buildBody(FishCatalogViewModel vm) {
+    if (vm.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (vm.error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(vm.error!),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => vm.refresh(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (vm.filteredFish.isEmpty) {
+      return const Center(
+        child: Text(
+          'No species found',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: vm.filteredFish.length,
+      itemBuilder: (context, index) {
+        final fish = vm.filteredFish[index];
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FishDetailPage(fish: fish),
+              ),
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey[200]!,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: fish.imageUrl.isNotEmpty
+                      ? Image.asset(
+                          fish.imageUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[200],
+                            child: Icon(Icons.image_outlined, color: Colors.grey[400]),
+                          ),
+                        )
+                      : Container(
+                          width: 50,
+                          height: 50,
+                          color: Colors.grey[200],
+                          child: Icon(Icons.image_outlined, color: Colors.grey[400]),
+                        ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fish.commonName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        fish.scientificName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        fish.habitat,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.grey[400]),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

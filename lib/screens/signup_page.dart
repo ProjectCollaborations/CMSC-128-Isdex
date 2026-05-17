@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'theme.dart';
-import '../services/auth_service.dart';
+import '../viewmodels/auth_viewmodel.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -10,75 +11,67 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final AuthService _authService = AuthService();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
-  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleSignUp() async {
-    if (_nameController.text.trim().isEmpty) {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (name.isEmpty) {
       _showError('Please enter your name');
       return;
     }
 
-    if (_emailController.text.trim().isEmpty) {
+    if (email.isEmpty) {
       _showError('Please enter your email');
       return;
     }
 
-    if (_passwordController.text.trim().isEmpty) {
+    if (password.isEmpty) {
       _showError('Please enter a password');
       return;
     }
 
-    if (_passwordController.text != _confirmPasswordController.text) {
+    if (password != confirmPassword) {
       _showError('Passwords do not match');
       return;
     }
 
-    if (_passwordController.text.length < 6) {
+    if (password.length < 6) {
       _showError('Password must be at least 6 characters');
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authVm = context.read<AuthViewModel>();
+    final success = await authVm.signUp(email, password, name);
 
-    try {
-      await _authService.signUpWithEmail(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-        _nameController.text.trim(),
+    if (success && mounted) {
+      // AuthGate will handle navigation based on role
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
-
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      _showError(_getErrorMessage(e.toString()));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } else if (mounted && authVm.error != null) {
+      _showError(authVm.error!);
+      authVm.clearError();
     }
-  }
-
-  String _getErrorMessage(String error) {
-    if (error.contains('email-already-in-use')) {
-      return 'This email is already registered';
-    } else if (error.contains('invalid-email')) {
-      return 'Invalid email address';
-    } else if (error.contains('weak-password')) {
-      return 'Password is too weak';
-    } else if (error.contains('network-request-failed')) {
-      return 'Network error. Please check your connection';
-    }
-    return 'Sign up failed. Please try again';
   }
 
   void _showError(String message) {
@@ -91,16 +84,9 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final authVm = context.watch<AuthViewModel>();
+
     return Scaffold(
       backgroundColor: kBackground,
       body: SafeArea(
@@ -142,7 +128,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                   width: 40,
                                 ),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
                                 'IsDex',
                                 style: TextStyle(
@@ -235,7 +221,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleSignUp,
+                              onPressed: authVm.isLoading ? null : _handleSignUp,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: kAccentBlue,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -243,7 +229,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: _isLoading
+                              child: authVm.isLoading
                                   ? const SizedBox(
                                       height: 20,
                                       width: 20,
