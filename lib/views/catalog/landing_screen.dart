@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../viewmodels/fish_catalog_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/fish.dart';
-import '../../screens/map_screen.dart';
 import '../../screens/community_page.dart';
-import '../../screens/user_sightings_map_screen.dart';
 import '../../screens/ai_chat_screen.dart';
 
 class LandingScreen extends StatefulWidget {
@@ -270,24 +268,14 @@ class _LandingScreenState extends State<LandingScreen> {
             ),
           IconButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MapScreen(),
-                ),
-              );
+              context.push('/map');
             },
             icon: Icon(Icons.map, color: Colors.grey[400], size: 28),
             tooltip: 'Reference map',
           ),
           IconButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UserSightingsMapScreen(),
-                ),
-              );
+              context.push('/sighting');
             },
             icon: Icon(
               Icons.location_on,

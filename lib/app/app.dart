@@ -7,10 +7,13 @@ import '../repositories/sighting_repository.dart';
 import '../repositories/community_repository.dart';
 import '../repositories/chat_repository.dart';
 import '../repositories/user_repository.dart';
+import '../repositories/map_repository.dart';
 import '../services/auth_service.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/fish_catalog_viewmodel.dart';
 import '../viewmodels/fish_detail_viewmodel.dart';
+import '../viewmodels/map_viewmodel.dart';
+import '../viewmodels/sighting_viewmodel.dart';
 import 'router.dart';
 
 class IsDexApp extends StatefulWidget {
@@ -49,6 +52,7 @@ class _IsDexAppState extends State<IsDexApp> {
         Provider(create: (_) => CommunityRepository(_db)),
         Provider(create: (_) => ChatRepository(_db)),
         Provider(create: (_) => UserRepository(_db)),
+        Provider(create: (_) => MapRepository(_db)),
         ChangeNotifierProvider<AuthViewModel>.value(value: _authVm),
         ChangeNotifierProvider(
           create: (ctx) => FishCatalogViewModel(
@@ -59,6 +63,20 @@ class _IsDexAppState extends State<IsDexApp> {
           create: (ctx) => FishDetailViewModel(
             (id) => ctx.read<FishRepository>().getById(id),
           ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final authVm = ctx.read<AuthViewModel>();
+            return SightingViewModel(
+              watchAllSightings: () => ctx.read<SightingRepository>().watchAll(),
+              pushSighting: (s) => ctx.read<SightingRepository>().push(s),
+              deleteSighting: (id) => ctx.read<SightingRepository>().delete(id),
+              reportSighting: (id) => ctx.read<SightingRepository>().reportSighting(id),
+              watchAllFish: () => ctx.read<FishRepository>().watchAll(),
+              currentUserId: () => authVm.user?.uid,
+              currentUserDisplay: () => authVm.user?.email?.split('@')[0] ?? 'Anonymous',
+            );
+          },
         ),
       ],
       child: MaterialApp.router(

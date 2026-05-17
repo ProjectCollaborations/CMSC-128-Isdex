@@ -5,7 +5,6 @@ import '../../viewmodels/fish_detail_viewmodel.dart';
 import '../../models/fish.dart';
 import '../../core/constants/app_theme.dart';
 import '../../services/iucn_service.dart';
-import '../../screens/map_screen.dart';
 
 class FishDetailScreen extends StatefulWidget {
   final String fishId;
@@ -403,15 +402,10 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
       children: [
         _buildTab('Information', true, () {}),
         _buildTab('Map', false, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MapScreen(
-                fishName: fish.commonName,
-                fishId: fish.id,
-              ),
-            ),
-          );
+          context.push('/map', extra: {
+            'fishName': fish.commonName,
+            'fishId': fish.id,
+          });
         }),
       ],
     );

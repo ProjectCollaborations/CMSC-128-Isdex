@@ -5,6 +5,8 @@ import '../viewmodels/fish_catalog_viewmodel.dart';
 import '../views/catalog/landing_screen.dart';
 import '../views/catalog/fish_detail_screen.dart';
 import '../views/catalog/fish_image_search_screen.dart';
+import '../views/map/map_screen.dart';
+import '../views/sighting/user_sightings_map_screen.dart';
 import '../views/auth/login_screen.dart';
 import '../views/auth/signup_screen.dart';
 import '../views/auth/splash_screen.dart';
@@ -58,6 +60,22 @@ GoRouter createRouter(AuthViewModel authVm) {
           final allFish = context.read<FishCatalogViewModel>().allFish;
           return FishImageSearchScreen(allSpecies: allFish);
         },
+      ),
+      GoRoute(
+        path: '/map',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return MapScreen(
+            fishId: extra?['fishId'] as String?,
+            fishName: extra?['fishName'] as String?,
+            latitude: extra?['latitude'] as double?,
+            longitude: extra?['longitude'] as double?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/sighting',
+        builder: (context, state) => const UserSightingsMapScreen(),
       ),
     ],
   );

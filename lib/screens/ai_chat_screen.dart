@@ -8,7 +8,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'theme.dart';
-import 'user_sightings_map_screen.dart';
 import 'package:go_router/go_router.dart';
 
 class AiChatScreen extends StatefulWidget {
@@ -472,7 +471,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       case 'Log Sighting':
       case 'Nearby Sightings':
       case 'My Logbook':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSightingsMapScreen()));
+        context.push('/sighting');
         break;
       case 'Browse Index':
         context.go('/');
