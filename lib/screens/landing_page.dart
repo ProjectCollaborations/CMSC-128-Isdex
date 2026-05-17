@@ -11,6 +11,7 @@ import 'login_page.dart';
 import 'map_screen.dart';
 import 'user_sightings_map_screen.dart';
 import 'ai_chat_screen.dart';
+import 'fish_image_search.dart';  // ← ADD THIS IMPORT
 import '../services/database_init_service.dart';
 import '../data/models/fish.dart';
 
@@ -171,9 +172,42 @@ class _LandingPageState extends State<LandingPage> {
                           icon: const Icon(Icons.camera_alt, color: Colors.blue),
                           tooltip: 'Search by photo',
                           onPressed: () {
-                            // TODO: Navigate to FishImageSearch with allSpecies
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Photo search coming soon')),
+                            final allFish = fishVm.filteredFish;
+                            
+                            if (allFish.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Loading fish data, please wait...'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                              return;
+                            }
+                            
+                            // Convert List<Fish> to List<Map<dynamic, dynamic>>
+                            final allSpecies = allFish.map((fish) {
+                              return {
+                                'fishId': fish.fishId,
+                                'commonName': fish.commonName,
+                                'scientificName': fish.scientificName,
+                                'localName': fish.localName,
+                                'habitat': fish.habitat,
+                                'sizeRange': fish.sizeRange,
+                                'imageUrl': fish.imageUrl,
+                                'identifyingFeatures': fish.identifyingFeatures,
+                                'conservationStatus': fish.conservationStatus,
+                                'conservationDetails': fish.conservationDetails,
+                                'distribution': fish.distribution,
+                              };
+                            }).toList();
+                            
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FishImageSearch(
+                                  allSpecies: allSpecies,
+                                ),
+                              ),
                             );
                           },
                         ),
