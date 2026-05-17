@@ -24,8 +24,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   LatLng? _userLocation;
 
   List<Map<String, dynamic>> _fishList = [];
+  Set<String> _activeFishIds = {};
   bool _fishLoaded = false;
   bool _isLocating = false;
+  Map<dynamic, dynamic>? _lastSightingsData;
 
   Future<Map<String, String>> _validateSightingLocation(LatLng latLng) async {
     final client = HttpClient();
@@ -153,25 +155,47 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     _getUserLocationOnStartup();
   }
 
-  Future<void> _loadFishList() async {
-    final snap = await _db.child('fish').get();
-    if (!snap.exists || snap.value == null) {
-      setState(() { _fishLoaded = true; _fishList = []; });
-      return;
-    }
+  void _loadFishList() {
+    _db.child('fish').onValue.listen((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        if (mounted) {
+          setState(() {
+            _fishLoaded = true;
+            _fishList = [];
+            _activeFishIds = {};
+          });
+        }
+        _rebuildMarkersFromSightings();
+        return;
+      }
 
-    final Map<dynamic, dynamic> fishMap = snap.value as Map<dynamic, dynamic>;
-    final List<Map<String, dynamic>> list = [];
-    fishMap.forEach((key, value) {
-      final m = Map<dynamic, dynamic>.from(value);
-      list.add({
-        'fishId': m['fishId']?.toString() ?? key.toString(),
-        'commonName': m['commonName']?.toString() ?? 'Unknown',
+      final Map<dynamic, dynamic> fishMap = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> list = [];
+      final Set<String> ids = {};
+
+      fishMap.forEach((key, value) {
+        final m = Map<dynamic, dynamic>.from(value);
+        final String fishId = m['fishId']?.toString() ?? key.toString();
+        list.add({
+          'fishId': fishId,
+          'commonName': m['commonName']?.toString() ?? 'Unknown',
+        });
+        ids.add(fishId);
+        ids.add(key.toString());
       });
-    });
 
-    list.sort((a, b) => a['commonName'].toString().compareTo(b['commonName'].toString()));
-    setState(() { _fishList = list; _fishLoaded = true; });
+      list.sort((a, b) => a['commonName'].toString().compareTo(b['commonName'].toString()));
+
+      if (mounted) {
+        setState(() {
+          _fishList = list;
+          _activeFishIds = ids;
+          _fishLoaded = true;
+        });
+      }
+
+      _rebuildMarkersFromSightings();
+    });
   }
 
   Future<void> _getUserLocationOnStartup() async {
@@ -214,8 +238,6 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
   void _listenToUserSightings() {
     _db.child('user_sightings_temp').onValue.listen((event) {
-      final List<Marker> markers = [];
-
       if (event.snapshot.exists && event.snapshot.value != null) {
         final data = event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
@@ -311,57 +333,37 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                         );
                       }
                     }
-                    return;
                   }
+                  return;
+                }
 
-                  if (action == 'viewInfo' && mounted) {
-                    showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      builder: (context) => SafeArea(
-                        minimum: const EdgeInsets.only(bottom: 8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(fishName,
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 6),
+                if (action == 'viewInfo' && mounted) {
+                  showModalBottomSheet(
+                    context: context,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    builder: (context) => SafeArea(
+                      minimum: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(fishName,
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 6),
 
-                              // SECURE: show display name, not UID
-                              Row(
-                                children: [
-                                  const Icon(Icons.person_outline, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isOwner ? 'Submitted by you' : 'Submitted by $displayName',
-                                    style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-
-                              // Show only approximate area, not exact coords
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Near ${lat.toStringAsFixed(2)}°, ${lng.toStringAsFixed(2)}°',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-
-                              if (notes.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                const Text('Notes:', style: TextStyle(fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                Text(notes, style: const TextStyle(fontSize: 15)),
+                            // SECURE: show display name, not UID
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isOwner ? 'Submitted by you' : 'Submitted by $displayName',
+                                  style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic),
+                                ),
                               ],
 
                               const SizedBox(height: 12),
@@ -405,39 +407,91 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                                         style: TextStyle(color: Colors.orange, fontSize: 14)),
                                   ),
                                 ),
+                              ],
+                            ),
+
+                            if (notes.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              const Text('Notes:', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              Text(notes, style: const TextStyle(fontSize: 15)),
                             ],
-                          ),
+
+                            const SizedBox(height: 12),
+                            if (isOwner)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    await _db.child('user_sightings_temp').child(key.toString()).remove();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Sighting deleted')),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                                  label: const Text('Delete this pin',
+                                      style: TextStyle(color: Colors.red, fontSize: 14)),
+                                ),
+                              )
+                            else if (status == 'approved') // Only show on public pins
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    // Flag the sighting in the database
+                                    await _db.child('user_sightings_temp').child(key.toString()).update({'isReported': true});
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Sighting reported to moderators.'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.flag, color: Colors.orange, size: 22),
+                                  label: const Text('Report inaccurate pin',
+                                      style: TextStyle(color: Colors.orange, fontSize: 14)),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    );
-                  }
-                },
-                child: Column(
-                  children: [
-                    Icon(Icons.location_on, color: pinColor, size: 40),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white70,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        fishName,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ),
-                  ],
-                ),
+                  );
+                }
+              },
+              child: Column(
+                children: [
+                  Icon(Icons.location_on, color: pinColor, size: 40),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      fishName,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-          );
-        });
-      }
+          ),
+        );
+      });
+    }
 
+    if (mounted) {
       setState(() { _markers..clear()..addAll(markers); });
-    });
+    }
   }
 
   /// Gets GPS location then opens the add sighting dialog

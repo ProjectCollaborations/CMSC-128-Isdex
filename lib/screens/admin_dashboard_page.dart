@@ -18,36 +18,34 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final AuthService _authService = AuthService();
   
   // State variables
-  final TextEditingController fishSearchController = TextEditingController();
-  final TextEditingController searchController = TextEditingController();
   String _currentUserRole = 'mod'; // Default fallback
   int _currentTabIndex = 0; // 0 = Sightings, 1 = Reports, 2 = Data, 3 = Users
   bool _isLoading = true;
   bool _isProcessing = false;
-  String _searchQuery = '';
+  final TextEditingController _fishSearchController = TextEditingController();
   String _fishSearchQuery = '';
-  List<Map<String, dynamic>> get _filteredUsers => _usersList.where((u) => u['username'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) || u['email'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-  
+  String _fishHabitatFilter = 'All';
+  String _fishSortMode = 'Name (A-Z)';
+
   // Data lists
   List<Map<String, dynamic>> _pendingSightings = [];
   List<Map<String, dynamic>> _reportedPosts = [];
   List<Map<String, dynamic>> _fishCatalog = [];
+  List<Map<String, dynamic>> _archivedFish = [];
   List<Map<String, dynamic>> _usersList = [];
   final Set<String> _selectedIds = {};
-  List<Map<String, dynamic>> get _filteredFish => _fishCatalog
-    .where((f) =>
-        f['commonName'].toString().toLowerCase().contains(_fishSearchQuery.toLowerCase()) ||
-        f['scientificName'].toString().toLowerCase().contains(_fishSearchQuery.toLowerCase()) ||
-        f['localName'].toString().toLowerCase().contains(_fishSearchQuery.toLowerCase()) ||
-        f['habitat'].toString().toLowerCase().contains(_fishSearchQuery.toLowerCase()) ||
-        f['conservationStatus'].toString().toLowerCase().contains(_fishSearchQuery.toLowerCase()))
-    .toList();
+  bool _showArchivedFish = false;
 
   @override
   void initState() {
     super.initState();
     _initializeDashboard();
-    
+  }
+
+  @override
+  void dispose() {
+    _fishSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeDashboard() async {
@@ -68,6 +66,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _listenToPendingSightings();
     _listenToReportedPosts();
     _listenToFishCatalog();
+    _listenToFishArchive();
   }
 
   // ==========================================
@@ -107,6 +106,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
   }
 
+  void _listenToFishArchive() {
+    _db.child('fish_archive').onValue.listen((event) {
+      final List<Map<String, dynamic>> fish = [];
+
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final data = event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          final m = Map<dynamic, dynamic>.from(value);
+          fish.add({
+            'key': key.toString(),
+            'fishId': m['fishId']?.toString() ?? key.toString(),
+            'commonName': m['commonName']?.toString() ?? 'Unknown',
+            'scientificName': m['scientificName']?.toString() ?? 'N/A',
+            'localName': m['localName']?.toString() ?? 'N/A',
+            'habitat': m['habitat']?.toString() ?? 'Unknown',
+            'archivedAt': m['archivedAt'],
+            'archivedBy': m['archivedBy']?.toString() ?? '',
+          });
+        });
+
+        fish.sort(
+          (a, b) => a['commonName'].toString().toLowerCase().compareTo(
+                b['commonName'].toString().toLowerCase(),
+              ),
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _archivedFish = fish;
+        });
+      }
+    });
+  }
+
   bool _isInvalidFirebaseKey(String value) {
     return value.contains('.') ||
         value.contains('#') ||
@@ -116,17 +150,80 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         value.contains('/');
   }
 
+  int _maxFishNumberFromId(String value) {
+    final match = RegExp(r'^fish_(\d+)$').firstMatch(value.trim());
+    if (match == null) return 0;
+    return int.tryParse(match.group(1) ?? '') ?? 0;
+  }
+
+  String _nextFishId() {
+    final Set<int> used = {};
+    for (final fish in _fishCatalog) {
+      final fishId = fish['fishId']?.toString() ?? '';
+      final value = _maxFishNumberFromId(fishId);
+      if (value > 0) used.add(value);
+    }
+
+    int next = 1;
+    while (used.contains(next)) {
+      next += 1;
+    }
+    return 'fish_$next';
+  }
+
+  InputDecoration _fieldDecoration(
+    String label, {
+    bool required = false,
+    String? hint,
+    IconData? icon,
+  }) {
+    return InputDecoration(
+      label: RichText(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(color: Colors.black87, fontSize: 15),
+          children: required
+              ? const [TextSpan(text: ' *', style: TextStyle(color: Colors.red))]
+              : const [],
+        ),
+      ),
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.blue[50],
+      prefixIcon: icon != null ? Icon(icon, color: Colors.blue[700]) : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.blue[100]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.blue[100]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.blue[400]!, width: 1.2),
+      ),
+    );
+  }
+
   Future<void> _showFishFormDialog({Map<String, dynamic>? existingFish}) async {
     final bool isEdit = existingFish != null;
 
-    final fishIdController = TextEditingController(text: existingFish?['fishId']?.toString() ?? '');
+    final String autoFishId = isEdit
+        ? (existingFish?['fishId']?.toString() ?? '')
+        : _nextFishId();
+
+    final fishIdController = TextEditingController(text: autoFishId);
     final commonNameController = TextEditingController(text: existingFish?['commonName']?.toString() ?? '');
     final scientificNameController = TextEditingController(text: existingFish?['scientificName']?.toString() ?? '');
     final localNameController = TextEditingController(text: existingFish?['localName']?.toString() ?? '');
     final habitatController = TextEditingController(text: existingFish?['habitat']?.toString() ?? '');
     final sizeRangeController = TextEditingController(text: existingFish?['sizeRange']?.toString() ?? '');
     final imageUrlController = TextEditingController(text: existingFish?['imageUrl']?.toString() ?? '');
-    final conservationStatusController = TextEditingController(text: existingFish?['conservationStatus']?.toString() ?? '');
+    final conservationStatusController = TextEditingController(
+      text: existingFish?['conservationStatus']?.toString() ?? 'Not Evaluated (NE)',
+    );
     final conservationDetailsController = TextEditingController(text: existingFish?['conservationDetails']?.toString() ?? '');
     final distributionController = TextEditingController(text: existingFish?['distribution']?.toString() ?? '');
 
@@ -143,77 +240,98 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       builder: (dialogContext) => AlertDialog(
         title: Text(isEdit ? 'Edit Fish Data' : 'Add Fish Data'),
         content: SizedBox(
-          width: 520,
+          width: 560,
           child: Form(
             key: formKey,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('Basic Info',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: fishIdController,
-                    enabled: !isEdit,
-                    decoration: const InputDecoration(
-                      labelText: 'Fish ID (Firebase key)',
-                      hintText: 'example: fish_51',
+                    readOnly: true,
+                    decoration: _fieldDecoration(
+                      'Fish ID (Firebase key)',
+                      hint: 'Auto-generated',
+                      icon: Icons.tag,
                     ),
-                    validator: (value) {
-                      final v = (value ?? '').trim();
-                      if (v.isEmpty) return 'Fish ID is required';
-                      if (_isInvalidFirebaseKey(v)) {
-                        return 'Fish ID cannot contain . # \$ [ ] /';
-                      }
-                      final alreadyExists = _fishCatalog.any((f) => f['key'] == v);
-                      if (!isEdit && alreadyExists) return 'Fish ID already exists';
-                      return null;
-                    },
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: commonNameController,
-                    decoration: const InputDecoration(labelText: 'Common Name'),
+                    decoration: _fieldDecoration('Common Name', required: true, icon: Icons.badge),
                     validator: (value) => (value == null || value.trim().isEmpty)
                         ? 'Common name is required'
                         : null,
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: scientificNameController,
-                    decoration: const InputDecoration(labelText: 'Scientific Name'),
+                    decoration: _fieldDecoration('Scientific Name', required: true, icon: Icons.science),
+                    validator: (value) => (value == null || value.trim().isEmpty)
+                        ? 'Scientific name is required'
+                        : null,
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: localNameController,
-                    decoration: const InputDecoration(labelText: 'Local Name'),
+                    decoration: _fieldDecoration('Local Name', icon: Icons.translate),
                   ),
+                  const SizedBox(height: 16),
+
+                  Text('Habitat & Size',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: habitatController,
-                    decoration: const InputDecoration(labelText: 'Habitat'),
+                    decoration: _fieldDecoration('Habitat', icon: Icons.water),
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: sizeRangeController,
-                    decoration: const InputDecoration(labelText: 'Size Range'),
+                    decoration: _fieldDecoration('Size Range', icon: Icons.straighten),
                   ),
+                  const SizedBox(height: 16),
+
+                  Text('Media & Features',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: imageUrlController,
-                    decoration: const InputDecoration(labelText: 'Image Asset Path'),
+                    decoration: _fieldDecoration('Image Asset Path', icon: Icons.image_outlined),
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: identifyingFeaturesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Identifying Features (comma-separated)',
+                    decoration: _fieldDecoration(
+                      'Identifying Features (comma-separated)',
+                      icon: Icons.list_alt,
                     ),
                     maxLines: 2,
                   ),
+                  const SizedBox(height: 16),
+
+                  Text('Conservation',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: conservationStatusController,
-                    decoration: const InputDecoration(labelText: 'Conservation Status'),
+                    decoration: _fieldDecoration('Conservation Status', icon: Icons.shield_outlined),
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: conservationDetailsController,
-                    decoration: const InputDecoration(labelText: 'Conservation Details'),
+                    decoration: _fieldDecoration('Conservation Details', icon: Icons.description_outlined),
                     maxLines: 2,
                   ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: distributionController,
-                    decoration: const InputDecoration(labelText: 'Distribution'),
+                    decoration: _fieldDecoration('Distribution', icon: Icons.public),
                     maxLines: 2,
                   ),
                 ],
@@ -362,7 +480,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return false;
   }
 
-  Future<void> _deleteFish(Map<String, dynamic> fish) async {
+
+  Future<void> _archiveFish(Map<String, dynamic> fish) async {
     final fishKey = fish['key'].toString();
     final fishId = fish['fishId'].toString();
     final fishName = fish['commonName'].toString();
@@ -370,21 +489,123 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Fish Data'),
-        content: Text('Delete "$fishName" ($fishId)? This cannot be undone.'),
+        title: const Text('Archive Fish Data'),
+        content: Text('Archive "$fishName" ($fishId)? You can restore it later.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: const Text('Archive'),
           ),
         ],
       ),
     );
+
+    if (confirm != true) return;
+
+    try {
+      final bool inUse = await _isFishReferenced(fishId, fishKey);
+      if (inUse) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot archive: this fish is referenced by map pins or sightings.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final snap = await _db.child('fish/$fishKey').get();
+      if (!snap.exists || snap.value == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fish record not found.'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+
+      final Map<dynamic, dynamic> full = Map<dynamic, dynamic>.from(snap.value as Map<dynamic, dynamic>);
+      full['archivedAt'] = DateTime.now().millisecondsSinceEpoch;
+      full['archivedBy'] = _authService.currentUser?.uid ?? '';
+
+      await _db.child('fish_archive/$fishKey').set(full);
+      await _db.child('fish/$fishKey').remove();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fish data archived.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error archiving fish data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _hardDeleteActiveFish(Map<String, dynamic> fish) async {
+    final fishKey = fish['key'].toString();
+    final fishId = fish['fishId'].toString();
+    final fishName = fish['commonName'].toString();
+
+    final confirmController = TextEditingController();
+    bool showError = false;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Hard Delete Fish Data'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Permanently delete "$fishName" ($fishId)? This cannot be undone.'),
+              const SizedBox(height: 12),
+              const Text('Type DELETE to confirm.'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmController,
+                decoration: InputDecoration(
+                  hintText: 'DELETE',
+                  border: const OutlineInputBorder(),
+                  errorText: showError ? 'Please type DELETE to confirm.' : null,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () {
+                final ok = confirmController.text.trim().toUpperCase() == 'DELETE';
+                if (!ok) {
+                  setDialogState(() => showError = true);
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    confirmController.dispose();
 
     if (confirm != true) return;
 
@@ -415,6 +636,213 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         );
       }
     }
+  }
+
+  Future<void> _restoreFish(Map<String, dynamic> fish) async {
+    final fishKey = fish['key'].toString();
+    final fishId = fish['fishId'].toString();
+    final fishName = fish['commonName'].toString();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Restore Fish Data'),
+        content: Text('Restore "$fishName" ($fishId) back to active records?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final keyConflict = _fishCatalog.any((f) => f['key'].toString() == fishKey);
+      final idConflict = _fishCatalog.any((f) => f['fishId'].toString() == fishId);
+      if (keyConflict || idConflict) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot restore: fish key or ID already exists in active records.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final snap = await _db.child('fish_archive/$fishKey').get();
+      if (!snap.exists || snap.value == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Archived fish record not found.'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+
+      final Map<dynamic, dynamic> full = Map<dynamic, dynamic>.from(snap.value as Map<dynamic, dynamic>);
+      full.remove('archivedAt');
+      full.remove('archivedBy');
+
+      await _db.child('fish/$fishKey').set(full);
+      await _db.child('fish_archive/$fishKey').remove();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fish data restored.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error restoring fish data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _hardDeleteArchivedFish(Map<String, dynamic> fish) async {
+    final fishKey = fish['key'].toString();
+    final fishId = fish['fishId'].toString();
+    final fishName = fish['commonName'].toString();
+
+    final confirmController = TextEditingController();
+    bool showError = false;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Hard Delete Fish Data'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Permanently delete archived "$fishName" ($fishId)? This cannot be undone.'),
+              const SizedBox(height: 12),
+              const Text('Type DELETE to confirm.'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmController,
+                decoration: InputDecoration(
+                  hintText: 'DELETE',
+                  border: const OutlineInputBorder(),
+                  errorText: showError ? 'Please type DELETE to confirm.' : null,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () {
+                final ok = confirmController.text.trim().toUpperCase() == 'DELETE';
+                if (!ok) {
+                  setDialogState(() => showError = true);
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    confirmController.dispose();
+
+    if (confirm != true) return;
+
+    try {
+      await _db.child('fish_archive/$fishKey').remove();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Archived fish data deleted.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting archived fish data: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  String _formatArchiveDate(dynamic raw) {
+    if (raw is int) {
+      return DateTime.fromMillisecondsSinceEpoch(raw).toLocal().toString().split('.').first;
+    }
+    return 'N/A';
+  }
+
+  List<String> _buildHabitatOptions(List<Map<String, dynamic>> source) {
+    final Set<String> habitats = {'All'};
+    for (final fish in source) {
+      final value = fish['habitat']?.toString().trim() ?? '';
+      if (value.isNotEmpty) habitats.add(value);
+    }
+    final List<String> result = habitats.toList();
+    result.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (result.first != 'All') {
+      result.remove('All');
+      result.insert(0, 'All');
+    }
+    return result;
+  }
+
+  List<Map<String, dynamic>> _filterFishList(
+    List<Map<String, dynamic>> source,
+    String habitatFilter,
+  ) {
+    final query = _fishSearchQuery.trim().toLowerCase();
+    final habitat = habitatFilter.toLowerCase();
+
+    final List<Map<String, dynamic>> filtered = source.where((fish) {
+      final fishId = fish['fishId']?.toString().toLowerCase() ?? '';
+      final commonName = fish['commonName']?.toString().toLowerCase() ?? '';
+      final scientificName = fish['scientificName']?.toString().toLowerCase() ?? '';
+      final fishHabitat = fish['habitat']?.toString().toLowerCase() ?? '';
+
+      final matchesQuery = query.isEmpty ||
+          fishId.contains(query) ||
+          commonName.contains(query) ||
+          scientificName.contains(query);
+
+      final matchesHabitat = habitat == 'all' || fishHabitat.contains(habitat);
+
+      return matchesQuery && matchesHabitat;
+    }).toList();
+
+    if (_fishSortMode == 'Fish ID') {
+      filtered.sort((a, b) {
+        final aId = _maxFishNumberFromId(a['fishId']?.toString() ?? '');
+        final bId = _maxFishNumberFromId(b['fishId']?.toString() ?? '');
+        return aId.compareTo(bId);
+      });
+    } else {
+      filtered.sort((a, b) {
+        final aName = a['commonName']?.toString().toLowerCase() ?? '';
+        final bName = b['commonName']?.toString().toLowerCase() ?? '';
+        return aName.compareTo(bName);
+      });
+    }
+
+    return filtered;
   }
 
   List<String> _coreSightingValidationErrors(Map<dynamic, dynamic> raw) {
@@ -760,78 +1188,118 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ? const Center(
                 child: Text('Queue is empty! Great job.', style: TextStyle(fontSize: 18, color: Colors.grey)),
               )
-            : SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    showCheckboxColumn: true,
-                    columns: const [
-                      DataColumn(label: Text('Submitted By', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Fish Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Validation', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('User Notes', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
-                    rows: _pendingSightings.map((sighting) {
-                      final String id = sighting['id'];
-                      return DataRow(
-                        selected: _selectedIds.contains(id),
-                        onSelectChanged: (bool? selected) {
-                          setState(() {
-                            if (selected == true) {
-                              _selectedIds.add(id);
-                            } else {
-                              _selectedIds.remove(id);
-                            }
-                          });
-                        },
-                        cells: [
-                          DataCell(Text(sighting['displayName'])),
-                          // FIX: Display orange flag if this pin was reported
-                          DataCell(
-                            Row(
-                              children: [
-                                Text(sighting['fishName']),
-                                if (sighting['isReported'] == true) ...[
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.flag, color: Colors.orange, size: 16),
-                                ]
-                              ],
-                            ),
-                          ),
-                          DataCell(
-                            Tooltip(
-                              message: sighting['isCoreValid'] == true
-                                  ? 'Core validation passed'
-                                  : (sighting['validationMessage']?.toString().isNotEmpty == true
-                                      ? sighting['validationMessage'].toString()
-                                      : 'Invalid data'),
-                              child: Chip(
-                                label: Text(
-                                  sighting['isCoreValid'] == true ? 'Valid' : 'Invalid',
-                                  style: TextStyle(
-                                    color: sighting['isCoreValid'] == true ? Colors.green[900] : Colors.red[900],
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                backgroundColor: sighting['isCoreValid'] == true
-                                    ? Colors.green[100]
-                                    : Colors.red[100],
-                                side: BorderSide.none,
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+                                ],
+                              ),
+                              child: DataTable(
+                                showCheckboxColumn: true,
+                                headingRowColor: MaterialStateProperty.all(Colors.blue[50]),
+                                dataRowMinHeight: 56,
+                                dataRowMaxHeight: 68,
+                                headingRowHeight: 56,
+                                columnSpacing: 24,
+                                horizontalMargin: 12,
+                                dividerThickness: 0.8,
+                                dataRowColor: MaterialStateProperty.resolveWith((states) {
+                                  if (states.contains(MaterialState.selected)) {
+                                    return Colors.blue[50];
+                                  }
+                                  return null;
+                                }),
+                                columns: const [
+                                  DataColumn(label: Text('Submitted By', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(label: Text('Fish Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(label: Text('Validation', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(label: Text('User Notes', style: TextStyle(fontWeight: FontWeight.bold))),
+                                ],
+                                rows: List.generate(_pendingSightings.length, (index) {
+                                  final sighting = _pendingSightings[index];
+                                  final String id = sighting['id'];
+                                  final bool shaded = index.isOdd;
+                                  return DataRow(
+                                    color: MaterialStateProperty.all(
+                                      shaded ? Colors.grey[50] : Colors.white,
+                                    ),
+                                    selected: _selectedIds.contains(id),
+                                    onSelectChanged: (bool? selected) {
+                                      setState(() {
+                                        if (selected == true) {
+                                          _selectedIds.add(id);
+                                        } else {
+                                          _selectedIds.remove(id);
+                                        }
+                                      });
+                                    },
+                                    cells: [
+                                      DataCell(Text(sighting['displayName'])),
+                                      DataCell(
+                                        Row(
+                                          children: [
+                                            Text(sighting['fishName']),
+                                            if (sighting['isReported'] == true) ...[
+                                              const SizedBox(width: 8),
+                                              const Icon(Icons.flag, color: Colors.orange, size: 16),
+                                            ]
+                                          ],
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Tooltip(
+                                          message: sighting['isCoreValid'] == true
+                                              ? 'Core validation passed'
+                                              : (sighting['validationMessage']?.toString().isNotEmpty == true
+                                                  ? sighting['validationMessage'].toString()
+                                                  : 'Invalid data'),
+                                          child: Chip(
+                                            label: Text(
+                                              sighting['isCoreValid'] == true ? 'Valid' : 'Invalid',
+                                              style: TextStyle(
+                                                color: sighting['isCoreValid'] == true ? Colors.green[900] : Colors.red[900],
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            backgroundColor: sighting['isCoreValid'] == true
+                                                ? Colors.green[100]
+                                                : Colors.red[100],
+                                            side: BorderSide.none,
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        SizedBox(
+                                          width: 300,
+                                          child: Text(sighting['notes'], overflow: TextOverflow.ellipsis),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }),
                               ),
                             ),
                           ),
-                          DataCell(
-                            SizedBox(
-                              width: 300,
-                              child: Text(sighting['notes'], overflow: TextOverflow.ellipsis),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
         ),
       ],
@@ -866,7 +1334,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.orange, width: 1)),
+                    elevation: 4,
+                    shadowColor: Colors.black12,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Row(
@@ -899,6 +1369,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                       onPressed: () => _handleReportedPost(post['id'], 'dismiss'),
                                       icon: const Icon(Icons.thumb_up_alt_outlined, color: Colors.green),
                                       label: const Text('Dismiss Report', style: TextStyle(color: Colors.green)),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: Colors.green[300]!),
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     ElevatedButton.icon(
@@ -924,636 +1397,484 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildUserManagement() {
-
-    final roleConfig = {
-      'admin': {
-        'label': 'Admin',
-        'bg': Colors.red[50],
-        'text': Colors.red[800],
-        'icon': Icons.shield,
-        'iconColor': Colors.red[700],
-      },
-      'mod': {
-        'label': 'Mod',
-        'bg': Colors.orange[50],
-        'text': Colors.orange[800],
-        'icon': Icons.verified_user,
-        'iconColor': Colors.orange[700],
-      },
-      'user': {
-        'label': 'User',
-        'bg': Colors.blue[50],
-        'text': Colors.blue[800],
-        'icon': Icons.person,
-        'iconColor': Colors.blue[700],
-      },
-    };
     return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      // ── Header ──────────────────────────────────────────────
-      Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          color: Colors.blue[50],
+          child: Text(
+            'Total Registered Users: ${_usersList.length}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[900],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.people_alt, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'User Management',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
-                    ),
-                    Text(
-                      '${_usersList.length} registered users',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // Search bar
-            TextField(
-              controller: searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: InputDecoration(
-                hintText: 'Search by username or email...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 20),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.close, color: Colors.grey[400], size: 18),
-                        onPressed: () {
-                          searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      // ── Role legend chips ────────────────────────────────────
-      Container(
-        color: Colors.grey[50],
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          children: [
-            Text('Roles:', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w600)),
-            const SizedBox(width: 8),
-            ...roleConfig.entries.map((e) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Chip(
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-                avatar: Icon(e.value['icon'] as IconData, size: 14, color: e.value['iconColor'] as Color?),
-                label: Text(e.value['label'] as String, style: TextStyle(fontSize: 11, color: e.value['text'] as Color?)),
-                backgroundColor: e.value['bg'] as Color?,
-                side: BorderSide.none,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-              ),
-            )),
-          ],
-        ),
-      ),
-
-      // ── User List ────────────────────────────────────────────
-      Expanded(
-        child: _usersList.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: Colors.blue[900]),
-                    const SizedBox(height: 12),
-                    Text('Loading users...', style: TextStyle(color: Colors.grey[500])),
-                  ],
-                ),
-              )
-            : _filteredUsers.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
-                        const SizedBox(height: 8),
-                        Text('No users match "$_searchQuery"', style: TextStyle(color: Colors.grey[500])),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredUsers.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final user = _filteredUsers[index];
-                      final isCurrentUser = user['uid'] == _authService.currentUser?.uid;
-                      final role = user['role'] as String;
-                      final config = roleConfig[role] ?? roleConfig['user']!;
-
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: isCurrentUser
-                              ? Border.all(color: Colors.blue[200]!, width: 1.5)
-                              : Border.all(color: Colors.grey[100]!, width: 1),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              // Avatar
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: config['bg'] as Color?,
-                                child: Text(
-                                  (user['username'] as String).isNotEmpty
-                                      ? (user['username'] as String)[0].toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: config['text'] as Color?,
-                                    fontSize: 16,
-                                  ),
-                                ),
+        Expanded(
+          child: _usersList.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+                                ],
                               ),
-                              const SizedBox(width: 12),
+                              child: DataTable(
+                                headingRowColor: MaterialStateProperty.all(Colors.blue[50]),
+                                dataRowMinHeight: 56,
+                                dataRowMaxHeight: 68,
+                                headingRowHeight: 56,
+                                columnSpacing: 24,
+                                horizontalMargin: 12,
+                                dividerThickness: 0.8,
+                                columns: const [
+                                  DataColumn(label: Text('Username', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(label: Text('Current Role', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  DataColumn(label: Text('Manage Access', style: TextStyle(fontWeight: FontWeight.bold))),
+                                ],
+                                rows: List.generate(_usersList.length, (index) {
+                                  final user = _usersList[index];
+                                  final isCurrentUser = user['uid'] == _authService.currentUser?.uid;
+                                  final bool shaded = index.isOdd;
 
-                              // Name + email
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          user['username'],
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                                        ),
-                                        if (isCurrentUser) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue[100],
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text('You', style: TextStyle(fontSize: 10, color: Colors.blue[800], fontWeight: FontWeight.bold)),
-                                          ),
-                                        ],
-                                      ],
+                                  return DataRow(
+                                    color: MaterialStateProperty.all(
+                                      shaded ? Colors.grey[50] : Colors.white,
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(user['email'], style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                                  ],
-                                ),
-                              ),
-
-                              // Role badge / dropdown
-                              const SizedBox(width: 8),
-                              if (isCurrentUser)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: config['bg'] as Color?,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(config['icon'] as IconData, size: 13, color: config['iconColor'] as Color?),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        config['label'] as String,
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: config['text'] as Color?),
+                                    cells: [
+                                      DataCell(Text(user['username'])),
+                                      DataCell(Text(user['email'])),
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: user['role'] == 'admin'
+                                                ? Colors.red[100]
+                                                : (user['role'] == 'mod' ? Colors.orange[100] : Colors.grey[200]),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            user['role'].toString().toUpperCase(),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: user['role'] == 'admin'
+                                                  ? Colors.red[900]
+                                                  : (user['role'] == 'mod' ? Colors.orange[900] : Colors.grey[800]),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        isCurrentUser
+                                            ? const Text('Cannot edit own role', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))
+                                            : DropdownButton<String>(
+                                                value: user['role'],
+                                                items: const [
+                                                  DropdownMenuItem(value: 'user', child: Text('Standard User')),
+                                                  DropdownMenuItem(value: 'mod', child: Text('Moderator')),
+                                                  DropdownMenuItem(value: 'admin', child: Text('Administrator')),
+                                                ],
+                                                onChanged: (newRole) {
+                                                  if (newRole != null) {
+                                                    _changeUserRole(user['uid'], newRole);
+                                                  }
+                                                },
+                                              ),
                                       ),
                                     ],
-                                  ),
-                                )
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: Colors.grey[200]!),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: role,
-                                      isDense: true,
-                                      borderRadius: BorderRadius.circular(10),
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                                      icon: Icon(Icons.expand_more, size: 16, color: Colors.grey[600]),
-                                      items: [
-                                        DropdownMenuItem(
-                                          value: 'user',
-                                          child: Row(children: [
-                                            Icon(Icons.person, size: 14, color: Colors.blue[700]),
-                                            const SizedBox(width: 6),
-                                            const Text('Standard User', style: TextStyle(fontSize: 13)),
-                                          ]),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'mod',
-                                          child: Row(children: [
-                                            Icon(Icons.verified_user, size: 14, color: Colors.orange[700]),
-                                            const SizedBox(width: 6),
-                                            const Text('Moderator', style: TextStyle(fontSize: 13)),
-                                          ]),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'admin',
-                                          child: Row(children: [
-                                            Icon(Icons.shield, size: 14, color: Colors.red[700]),
-                                            const SizedBox(width: 6),
-                                            const Text('Administrator', style: TextStyle(fontSize: 13)),
-                                          ]),
-                                        ),
-                                      ],
-                                      onChanged: (newRole) {
-                                        if (newRole != null) _changeUserRole(user['uid'], newRole);
-                                      },
-                                    ),
-                                  ),
-                                ),
-                            ],
+                                  );
+                                }),
+                              ),
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-      ),
-    ],
-  );
-}
+                      ),
+                    ),
+                  );
+                },
+              ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildFishManagement() {
+    final List<Map<String, dynamic>> sourceFish =
+        _showArchivedFish ? _archivedFish : _fishCatalog;
+    final List<String> habitatOptions = _buildHabitatOptions(sourceFish);
+    final List<String> sortOptions = const ['Name (A-Z)', 'Fish ID'];
+    final String effectiveHabitat = habitatOptions.contains(_fishHabitatFilter)
+        ? _fishHabitatFilter
+        : 'All';
+    final List<Map<String, dynamic>> visibleFish =
+        _filterFishList(sourceFish, effectiveHabitat);
+    final int totalCount = sourceFish.length;
+    final bool isNarrow = MediaQuery.of(context).size.width < 900;
 
-  final habitatColors = {
-    'freshwater': (bg: Colors.blue[50]!,   text: Colors.blue[800]!,   icon: Icons.water),
-    'saltwater':  (bg: Colors.cyan[50]!,   text: Colors.cyan[800]!,   icon: Icons.waves),
-    'brackish':   (bg: Colors.teal[50]!,   text: Colors.teal[800]!,   icon: Icons.blur_on),
-    'coral reef': (bg: Colors.orange[50]!, text: Colors.orange[800]!, icon: Icons.spa),
-  };
-
-  // Conservation status color coding
-  final statusColors = {
-    'LC': (bg: Colors.green[50]!,  text: Colors.green[800]!,  label: 'Least Concern'),
-    'NT': (bg: Colors.lime[50]!,   text: Colors.lime[800]!,   label: 'Near Threatened'),
-    'VU': (bg: Colors.yellow[50]!, text: Colors.yellow[800]!, label: 'Vulnerable'),
-    'EN': (bg: Colors.orange[50]!, text: Colors.orange[800]!, label: 'Endangered'),
-    'CR': (bg: Colors.red[50]!,    text: Colors.red[800]!,    label: 'Critically Endangered'),
-    'EW': (bg: Colors.purple[50]!, text: Colors.purple[800]!, label: 'Extinct in Wild'),
-    'EX': (bg: Colors.grey[200]!,  text: Colors.grey[800]!,   label: 'Extinct'),
-  };
-
-  ({Color bg, Color text, IconData icon}) getHabitatStyle(String habitat) {
-    final key = habitatColors.keys.firstWhere(
-      (k) => habitat.toLowerCase().contains(k),
-      orElse: () => '',
-    );
-    return habitatColors[key] ?? (bg: Colors.grey[100]!, text: Colors.grey[700]!, icon: Icons.help_outline);
-  }
-
-  ({Color bg, Color text, String label}) getStatusStyle(String status) {
-    final key = statusColors.keys.firstWhere(
-      (k) => status.toUpperCase().contains(k),
-      orElse: () => '',
-    );
-    return statusColors[key] ?? (bg: Colors.grey[100]!, text: Colors.grey[600]!, label: status);
-  }
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      // ── Header ──────────────────────────────────────────────
-      Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.teal[700], borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.set_meal, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Fish Catalog', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-                      Text('${_fishCatalog.length} species on record', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () => _showFishFormDialog(),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add Fish'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.teal[700],
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: fishSearchController,
-              textDirection: TextDirection.ltr,
-              onChanged: (val) => setState(() => _fishSearchQuery = val),
-              decoration: InputDecoration(
-                hintText: 'Search by name, scientific name, or habitat...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 20),
-                suffixIcon: _fishSearchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.close, color: Colors.grey[400], size: 18),
-                        onPressed: () { fishSearchController.clear(); setState(() => _fishSearchQuery = ''); },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _showArchivedFish
+                    ? 'Archived Fish Records: $totalCount'
+                    : 'Total Fish Records: $totalCount',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue[900]),
               ),
-            ),
-          ],
-        ),
-      ),
-
-      // ── Fish List ────────────────────────────────────────────
-      Expanded(
-        child: _fishCatalog.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+              const SizedBox(height: 12),
+              if (isNarrow) ...[
+                Row(
                   children: [
-                    Icon(Icons.set_meal, size: 56, color: Colors.grey[200]),
-                    const SizedBox(height: 12),
-                    Text('No fish records yet.', style: TextStyle(fontSize: 16, color: Colors.grey[400])),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: () => _showFishFormDialog(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add First Fish'),
-                      style: FilledButton.styleFrom(backgroundColor: Colors.teal[700]),
+                    ChoiceChip(
+                      label: const Text('Active'),
+                      selected: !_showArchivedFish,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _showArchivedFish = false);
+                      },
                     ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Archived'),
+                      selected: _showArchivedFish,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _showArchivedFish = true);
+                      },
+                    ),
+                    const Spacer(),
+                    if (!_showArchivedFish)
+                      ElevatedButton.icon(
+                        onPressed: () => _showFishFormDialog(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Fish'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
                   ],
                 ),
-              )
-            : _filteredFish.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
-                        const SizedBox(height: 8),
-                        Text('No fish match "$_fishSearchQuery"', style: TextStyle(color: Colors.grey[500])),
-                      ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _fishSearchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or fish ID...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _fishSearchQuery.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _fishSearchController.clear();
+                              setState(() => _fishSearchQuery = '');
+                            },
+                          ),
+                    filled: true,
+                    fillColor: Colors.blue[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue[100]!),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredFish.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final fish = _filteredFish[index];
-                      final habitat = fish['habitat']?.toString() ?? 'Unknown';
-                      final status = fish['conservationStatus']?.toString() ?? '';
-                      final details = fish['conservationDetails']?.toString() ?? '';
-                      final localName = fish['localName']?.toString() ?? '';
-                      final sizeRange = fish['sizeRange']?.toString() ?? '';
-                      final habitatStyle = getHabitatStyle(habitat);
-                      final statusStyle = getStatusStyle(status);
-                      final hasImage = fish['imageUrl'] != null && fish['imageUrl'].toString().isNotEmpty;
-
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.grey[100]!, width: 1),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-
-                            // ── Top row: icon/image + names + actions ──
-                            Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Fish image or fallback icon
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: hasImage
-                                        ? Image.asset(
-                                            fish['imageUrl'].toString(),
-                                            width: 52,
-                                            height: 52,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => _fishIconFallback(habitatStyle),
-                                          )
-                                        : _fishIconFallback(habitatStyle),
-                                  ),
-                                  const SizedBox(width: 12),
-
-                                  // Names + badges
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                fish['commonName']?.toString() ?? 'Unknown',
-                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(6)),
-                                              child: Text('#${fish['fishId']}', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w500)),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          fish['scientificName']?.toString() ?? '',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey[500], fontStyle: FontStyle.italic),
-                                        ),
-                                        if (localName.isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Local: $localName',
-                                            style: TextStyle(fontSize: 12, color: Colors.teal[700], fontWeight: FontWeight.w500),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Edit / Delete
-                                  const SizedBox(width: 8),
-                                  Column(
-                                    children: [
-                                      _actionButton(icon: Icons.edit_outlined,   color: Colors.blue, tooltip: 'Edit fish',   onTap: () => _openEditFishDialog(fish)),
-                                      const SizedBox(height: 6),
-                                      _actionButton(icon: Icons.delete_outline,  color: Colors.red,  tooltip: 'Delete fish', onTap: () => _deleteFish(fish)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // ── Divider ──
-                            Divider(height: 1, color: Colors.grey[100]),
-
-                            // ── Detail chips row ──
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 6,
-                                children: [
-                                  // Habitat
-                                  _infoBadge(
-                                    icon: habitatStyle.icon,
-                                    label: habitat,
-                                    bg: habitatStyle.bg,
-                                    text: habitatStyle.text,
-                                  ),
-                                  // Size range
-                                  if (sizeRange.isNotEmpty)
-                                    _infoBadge(
-                                      icon: Icons.straighten,
-                                      label: sizeRange,
-                                      bg: Colors.indigo[50]!,
-                                      text: Colors.indigo[800]!,
-                                    ),
-                                  // Conservation status
-                                  if (status.isNotEmpty)
-                                    _infoBadge(
-                                      icon: Icons.eco,
-                                      label: status,
-                                      bg: statusStyle.bg,
-                                      text: statusStyle.text,
-                                    ),
-                                ],
-                              ),
-                            ),
-
-                            // ── Conservation details (collapsible) ──
-                            if (details.isNotEmpty)
-                              _ConservationDetailsExpansion(details: details, statusStyle: statusStyle),
-
-                          ],
-                        ),
-                      );
-                    },
                   ),
-      ),
-    ],
-  );
-}
-
-// ── Fallback icon box when no image ──────────────────────────
-Widget _fishIconFallback(({Color bg, Color text, IconData icon}) style) {
-  return Container(
-    width: 52,
-    height: 52,
-    decoration: BoxDecoration(color: style.bg, borderRadius: BorderRadius.circular(10)),
-    child: Icon(style.icon, color: style.text, size: 24),
-  );
-}
-
-Widget _infoBadge({required IconData icon, required String label, required Color bg, required Color text}) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: text),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: text, fontWeight: FontWeight.w500)),
+                  onChanged: (value) => setState(() => _fishSearchQuery = value),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: effectiveHabitat,
+                  items: habitatOptions
+                      .map((h) => DropdownMenuItem(value: h, child: Text(h)))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _fishHabitatFilter = value);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Habitat',
+                    filled: true,
+                    fillColor: Colors.blue[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue[100]!),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _fishSortMode,
+                  items: sortOptions
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _fishSortMode = value);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Sort by',
+                    filled: true,
+                    fillColor: Colors.blue[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue[100]!),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Active'),
+                      selected: !_showArchivedFish,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _showArchivedFish = false);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Archived'),
+                      selected: _showArchivedFish,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _showArchivedFish = true);
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: _fishSearchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search by name or fish ID...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _fishSearchQuery.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _fishSearchController.clear();
+                                    setState(() => _fishSearchQuery = '');
+                                  },
+                                ),
+                          filled: true,
+                          fillColor: Colors.blue[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.blue[100]!),
+                          ),
+                        ),
+                        onChanged: (value) => setState(() => _fishSearchQuery = value),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 220,
+                      child: DropdownButtonFormField<String>(
+                        value: effectiveHabitat,
+                        items: habitatOptions
+                            .map((h) => DropdownMenuItem(value: h, child: Text(h)))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _fishHabitatFilter = value);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Habitat',
+                          filled: true,
+                          fillColor: Colors.blue[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.blue[100]!),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 180,
+                      child: DropdownButtonFormField<String>(
+                        value: _fishSortMode,
+                        items: sortOptions
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _fishSortMode = value);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Sort by',
+                          filled: true,
+                          fillColor: Colors.blue[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.blue[100]!),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (!_showArchivedFish)
+                      ElevatedButton.icon(
+                        onPressed: () => _showFishFormDialog(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Fish'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: visibleFish.isEmpty
+              ? const Center(
+                  child: Text('No fish records found.', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+                                  ],
+                                ),
+                                child: DataTable(
+                                  headingRowColor: MaterialStateProperty.all(Colors.blue[50]),
+                                  dataRowMinHeight: 56,
+                                  dataRowMaxHeight: 68,
+                                  headingRowHeight: 56,
+                                  columnSpacing: 24,
+                                  horizontalMargin: 12,
+                                  dividerThickness: 0.8,
+                                  dataRowColor: MaterialStateProperty.resolveWith((states) {
+                                    if (states.contains(MaterialState.selected)) {
+                                      return Colors.blue[50];
+                                    }
+                                    return null;
+                                  }),
+                                  columns: [
+                                    const DataColumn(label: Text('Fish ID', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const DataColumn(label: Text('Common Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const DataColumn(label: Text('Scientific Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const DataColumn(label: Text('Habitat', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    if (_showArchivedFish)
+                                      const DataColumn(label: Text('Archived At', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                                  ],
+                                  rows: List.generate(visibleFish.length, (index) {
+                                    final fish = visibleFish[index];
+                                    final bool shaded = index.isOdd;
+                                    return DataRow(
+                                      color: MaterialStateProperty.all(
+                                        shaded ? Colors.grey[50] : Colors.white,
+                                      ),
+                                      cells: [
+                                        DataCell(Text(fish['fishId'].toString(), style: const TextStyle(fontWeight: FontWeight.w600))),
+                                        DataCell(Text(fish['commonName'].toString())),
+                                        DataCell(
+                                          SizedBox(
+                                            width: 220,
+                                            child: Text(
+                                              fish['scientificName'].toString(),
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontStyle: FontStyle.italic),
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(Text(fish['habitat'].toString())),
+                                        if (_showArchivedFish)
+                                          DataCell(Text(_formatArchiveDate(fish['archivedAt']))),
+                                        DataCell(
+                                          Row(
+                                            children: [
+                                              if (!_showArchivedFish) ...[
+                                                IconButton(
+                                                  tooltip: 'Edit fish',
+                                                  onPressed: () => _openEditFishDialog(fish),
+                                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                                ),
+                                                IconButton(
+                                                  tooltip: 'Archive fish',
+                                                  onPressed: () => _archiveFish(fish),
+                                                  icon: const Icon(Icons.archive, color: Colors.orange),
+                                                ),
+                                                IconButton(
+                                                  tooltip: 'Hard delete',
+                                                  onPressed: () => _hardDeleteActiveFish(fish),
+                                                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                                                ),
+                                              ] else ...[
+                                                IconButton(
+                                                  tooltip: 'Restore fish',
+                                                  onPressed: () => _restoreFish(fish),
+                                                  icon: const Icon(Icons.restore, color: Colors.green),
+                                                ),
+                                                IconButton(
+                                                  tooltip: 'Hard delete',
+                                                  onPressed: () => _hardDeleteArchivedFish(fish),
+                                                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
       ],
-    ),
-  );
-}
-
-// ── Reusable action button ────────────────────────────────────
-Widget _actionButton({required IconData icon, required Color color, required String tooltip, required VoidCallback onTap}) {
-  return Tooltip(
-    message: tooltip,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-        child: Icon(icon, size: 18, color: color),
-      ),
-    ),
-  );
-}
+    );
+  }
 
   // Determine which view to render based on the selected tab
   Widget _buildBody() {
@@ -1567,33 +1888,83 @@ Widget _actionButton({required IconData icon, required Color color, required Str
   // Dynamic tabs based on role
   List<BottomNavigationBarItem> get _navItems {
     List<BottomNavigationBarItem> items = [
-      const BottomNavigationBarItem(icon: Icon(Icons.map,), label: 'Sightings'),
-      const BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'Reports'),
-      const BottomNavigationBarItem(icon: Icon(Icons.storage), label: 'Data'),
+      _navItem(Icons.map, 'Sightings'),
+      _navItem(Icons.flag, 'Reports'),
+      _navItem(Icons.storage, 'Data'),
     ];
     if (_currentUserRole == 'admin') {
-      items.add(const BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'));
+      items.add(_navItem(Icons.people, 'Users'));
     }
     return items;
   }
 
+  BottomNavigationBarItem _navItem(IconData icon, String label) {
+    return BottomNavigationBarItem(
+      icon: _NavLabelIcon(icon: icon, label: label, color: Colors.blueGrey[600]! ),
+      activeIcon: _NavLabelIcon(icon: icon, label: label, color: Colors.blue[900]! ),
+      label: '',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final String currentSection = _currentTabIndex == 0
+        ? 'Sightings Queue'
+        : _currentTabIndex == 1
+            ? 'Reported Posts'
+            : _currentTabIndex == 2
+                ? 'Fish Data'
+                : 'User Management';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _currentTabIndex == 0 ? 'Sightings Queue' 
-          : _currentTabIndex == 1 ? 'Reported Posts' 
-          : _currentTabIndex == 2 ? 'Fish Data'
-          : 'User Management'
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/isdex_logo.png',
+              height: 32,
+              width: 32,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Isdex',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                Text(
+                  currentSection,
+                  style: TextStyle(fontSize: 12, color: Colors.blueGrey[600]),
+                ),
+              ],
+            ),
+          ],
         ),
-        backgroundColor: Colors.blue[900],
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.blue,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log Out',
-            onPressed: () => _authService.signOut(),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              onPressed: () => _authService.signOut(),
+              icon: const Icon(Icons.logout, size: 18),
+              label: const Text('Log Out'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[100],
+                foregroundColor: Colors.blue[900],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+              ),
+            ),
           ),
         ],
       ),
@@ -1604,68 +1975,40 @@ Widget _actionButton({required IconData icon, required Color color, required Str
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTabIndex,
         onTap: (index) => setState(() => _currentTabIndex = index),
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white60,  // or Colors.blue[200], etc.
-        backgroundColor: Colors.blue[900],    // match your AppBar color
-        type: BottomNavigationBarType.fixed,  // required when you have 4+ items
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
+        selectedItemColor: Colors.blue[900],
+        unselectedItemColor: Colors.blueGrey[600],
         items: _navItems,
       ),
     );
   }
 }
 
-class _ConservationDetailsExpansion extends StatefulWidget {
-  final String details;
-  final ({Color bg, Color text, String label}) statusStyle;
+class _NavLabelIcon extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
 
-  const _ConservationDetailsExpansion({required this.details, required this.statusStyle});
-
-  @override
-  State<_ConservationDetailsExpansion> createState() => _ConservationDetailsExpansionState();
-}
-
-class _ConservationDetailsExpansionState extends State<_ConservationDetailsExpansion> {
-  bool _expanded = false;
+  const _NavLabelIcon({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Divider(height: 1, color: Colors.grey[100]),
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            child: Row(
-              children: [
-                Icon(Icons.eco, size: 14, color: widget.statusStyle.text),
-                const SizedBox(width: 6),
-                Text(
-                  'Conservation Notes',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.statusStyle.text),
-                ),
-                const Spacer(),
-                Icon(
-                  _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: Colors.grey[400],
-                ),
-              ],
-            ),
-          ),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
         ),
-        if (_expanded)
-          Container(
-            margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: widget.statusStyle.bg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(widget.details, style: TextStyle(fontSize: 13, color: widget.statusStyle.text, height: 1.5)),
-          ),
+        const SizedBox(height: 4),
+        Icon(icon, color: color, size: 22),
       ],
     );
   }
