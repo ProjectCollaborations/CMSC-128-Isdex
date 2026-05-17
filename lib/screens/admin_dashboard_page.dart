@@ -373,7 +373,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     final String recordKey = isEdit
-        ? existingFish!['key'].toString()
+        ? existingFish['key'].toString()
         : fishIdController.text.trim();
 
     final List<String> identifyingFeatures = identifyingFeaturesController.text

@@ -215,7 +215,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       if (!serviceEnabled) return;
 
       final Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final LatLng latLng = LatLng(position.latitude, position.longitude);
@@ -237,113 +239,99 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   void _listenToUserSightings() {
     _db.child('user_sightings_temp').onValue.listen((event) {
       if (event.snapshot.exists && event.snapshot.value != null) {
-        _lastSightingsData = event.snapshot.value as Map<dynamic, dynamic>;
-      } else {
-        _lastSightingsData = null;
-      }
+        final data = event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          final m = value as Map<dynamic, dynamic>;
+          final lat = (m['latitude'] as num?)?.toDouble();
+          final lng = (m['longitude'] as num?)?.toDouble();
+          if (lat == null || lng == null) return;
 
-      _rebuildMarkersFromSightings();
-    });
-  }
+          final fishName = (m['fishName'] ?? 'Sighting').toString();
+          final notes = (m['notes'] ?? '').toString();
+          final fishId = (m['fishId'] ?? '').toString();
+          final ownerId = (m['userId'] ?? '').toString();
+          final displayName = (m['displayName'] ?? 'Anonymous').toString();
+          final status = (m['status'] ?? 'pending').toString(); // Default to pending
+          
+          final currentUser = FirebaseAuth.instance.currentUser;
+          final isOwner = currentUser != null && currentUser.uid == ownerId;
 
-  void _rebuildMarkersFromSightings() {
-    final data = _lastSightingsData;
-    final List<Marker> markers = [];
+          // MODERATION FILTER: 
+          // If it is NOT approved, and the current user is NOT the owner, hide it.
+          if (status != 'approved' && !isOwner) {
+            return; 
+          }
 
-    if (data != null) {
-      data.forEach((key, value) {
-        final m = value as Map<dynamic, dynamic>;
-        final lat = (m['latitude'] as num?)?.toDouble();
-        final lng = (m['longitude'] as num?)?.toDouble();
-        if (lat == null || lng == null) return;
+          // UX: Pending pins are orange, approved are red.
+          final pinColor = status == 'pending' ? Colors.orange : Colors.red;
 
-        final fishName = (m['fishName'] ?? 'Sighting').toString();
-        final notes = (m['notes'] ?? '').toString();
-        final fishId = (m['fishId'] ?? '').toString();
-        final ownerId = (m['userId'] ?? '').toString();
-        final displayName = (m['displayName'] ?? 'Anonymous').toString();
-        final status = (m['status'] ?? 'pending').toString(); // Default to pending
+          markers.add(
+            Marker(
+              point: LatLng(lat, lng),
+              width: 80,
+              height: 80,
+              child: GestureDetector(
+                onTap: () async {
+                  if (!mounted) return;
+                  final markerContext = context;
 
-        if (_fishLoaded && fishId.isNotEmpty && !_activeFishIds.contains(fishId)) {
-          return;
-        }
-
-        final currentUser = FirebaseAuth.instance.currentUser;
-        final isOwner = currentUser != null && currentUser.uid == ownerId;
-
-        // MODERATION FILTER:
-        // If it is NOT approved, and the current user is NOT the owner, hide it.
-        if (status != 'approved' && !isOwner) {
-          return;
-        }
-
-        // UX: Pending pins are orange, approved are red.
-        final pinColor = status == 'pending' ? Colors.orange : Colors.red;
-
-        markers.add(
-          Marker(
-            point: LatLng(lat, lng),
-            width: 80,
-            height: 80,
-            child: GestureDetector(
-              onTap: () async {
-                if (!mounted) return;
-
-                final action = await showDialog<String>(
-                  context: context,
-                  builder: (context) => SimpleDialog(
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(fishName,
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text(
-                          status == 'pending'
-                              ? 'Status: Pending Moderator Approval'
-                              : 'User-submitted sighting. May not be scientifically verified.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: status == 'pending' ? Colors.orange[700] : Colors.grey[700],
-                            fontStyle: FontStyle.italic,
-                            fontWeight: status == 'pending' ? FontWeight.bold : FontWeight.normal,
+                  final action = await showDialog<String>(
+                    context: markerContext,
+                    builder: (dialogContext) => SimpleDialog(
+                      title: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(fishName,
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text(
+                            status == 'pending' 
+                                ? 'Status: Pending Moderator Approval' 
+                                : 'User-submitted sighting. May not be scientifically verified.',
+                            style: TextStyle(
+                              fontSize: 13, 
+                              color: status == 'pending' ? Colors.orange[700] : Colors.grey[700], 
+                              fontStyle: FontStyle.italic,
+                              fontWeight: status == 'pending' ? FontWeight.bold : FontWeight.normal,
+                            ),
                           ),
+                        ],
+                      ),
+                      children: [
+                        SimpleDialogOption(
+                          onPressed: () => Navigator.pop(dialogContext, 'viewInfo'),
+                          child: const Text('View sighting details', style: TextStyle(fontSize: 16)),
+                        ),
+                        SimpleDialogOption(
+                          onPressed: () => Navigator.pop(dialogContext, 'viewFish'),
+                          child: const Text('View fish information page', style: TextStyle(fontSize: 16)),
                         ),
                       ],
                     ),
-                    children: [
-                      SimpleDialogOption(
-                        onPressed: () => Navigator.pop(context, 'viewInfo'),
-                        child: const Text('View sighting details', style: TextStyle(fontSize: 16)),
-                      ),
-                      SimpleDialogOption(
-                        onPressed: () => Navigator.pop(context, 'viewFish'),
-                        child: const Text('View fish information page', style: TextStyle(fontSize: 16)),
-                      ),
-                    ],
-                  ),
-                );
+                  );
+                  if (!markerContext.mounted) return;
 
-                if (action == 'viewFish') {
-                  if (fishId.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('This sighting is not linked to a fish.')),
-                    );
-                    return;
-                  }
-                  final fishSnap = await _db.child('fish').child(fishId).get();
-                  if (fishSnap.exists && fishSnap.value != null) {
-                    final fishData = Map<dynamic, dynamic>.from(fishSnap.value as Map<dynamic, dynamic>);
-                    if (mounted) {
-                      Navigator.push(context, MaterialPageRoute(
-                        builder: (context) => FishDetailPage(fish: fishData),
-                      ));
-                    }
-                  } else {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Fish details not found.')),
+                  if (action == 'viewFish') {
+                    if (fishId.isEmpty) {
+                      ScaffoldMessenger.of(markerContext).showSnackBar(
+                        const SnackBar(content: Text('This sighting is not linked to a fish.')),
                       );
+                      return;
+                    }
+                    final fishSnap = await _db.child('fish').child(fishId).get();
+                    if (fishSnap.exists && fishSnap.value != null) {
+                      final fishData = Map<dynamic, dynamic>.from(fishSnap.value as Map<dynamic, dynamic>);
+                      if (markerContext.mounted) {
+                        Navigator.push(markerContext, MaterialPageRoute(
+                          builder: (context) => FishDetailPage(fish: fishData),
+                        ));
+                      }
+                    } else {
+                      if (markerContext.mounted) {
+                        ScaffoldMessenger.of(markerContext).showSnackBar(
+                          const SnackBar(content: Text('Fish details not found.')),
+                        );
+                      }
                     }
                   }
                   return;
@@ -377,17 +365,47 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                                   style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 10),
 
-                            // Show only approximate area, not exact coords
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Near ${lat.toStringAsFixed(2)}°, ${lng.toStringAsFixed(2)}°',
-                                  style: const TextStyle(fontSize: 14),
+                              const SizedBox(height: 12),
+                              if (isOwner)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+                                      await _db.child('user_sightings_temp').child(key.toString()).remove();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Sighting deleted')),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                                    label: const Text('Delete this pin',
+                                        style: TextStyle(color: Colors.red, fontSize: 14)),
+                                  ),
+                                )
+                              else if (status == 'approved') // Only show on public pins
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+                                      // Flag the sighting in the database
+                                      await _db.child('user_sightings_temp').child(key.toString()).update({'isReported': true});
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Sighting reported to moderators.'),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.flag, color: Colors.orange, size: 22),
+                                    label: const Text('Report inaccurate pin',
+                                        style: TextStyle(color: Colors.orange, fontSize: 14)),
+                                  ),
                                 ),
                               ],
                             ),
@@ -523,7 +541,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
       // 2. Get position
       final Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final LatLng latLng = LatLng(position.latitude, position.longitude);

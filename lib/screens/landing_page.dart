@@ -88,31 +88,6 @@ void _showFishDetails(Map<dynamic, dynamic> fish) {
   );
 }
 
-
-  Widget _buildDetailItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-
       void _showUserMenu() {
       User? user = FirebaseAuth.instance.currentUser;
 
@@ -138,9 +113,11 @@ void _showFishDetails(Map<dynamic, dynamic> fish) {
                   leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text('Sign Out'),
                   onTap: () async {
-                    await FirebaseAuth.instance.signOut();
+                    final rootContext = this.context;
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    await FirebaseAuth.instance.signOut();
+                    if (!rootContext.mounted) return;
+                    ScaffoldMessenger.of(rootContext).showSnackBar(
                       const SnackBar(content: Text('Signed out successfully')),
                     );
                   },

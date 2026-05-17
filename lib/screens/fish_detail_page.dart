@@ -357,7 +357,7 @@ class _FishDetailPageState extends State<FishDetailPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -395,9 +395,9 @@ class _FishDetailPageState extends State<FishDetailPage> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.30)),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
       child: Row(
         children: [
@@ -420,9 +420,9 @@ class _FishDetailPageState extends State<FishDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withOpacity(0.45)),
+              border: Border.all(color: color.withValues(alpha: 0.45)),
             ),
             child: Text(
               'IUCN Red List',
@@ -441,7 +441,7 @@ class _FishDetailPageState extends State<FishDetailPage> {
   // ── Full conservation detail card ─────────────────────────────────────────
   Widget _buildConservationStatusSection() {
     final color = _statusColor(_status);
-    final lightColor = color.withOpacity(0.10);
+    final lightColor = color.withValues(alpha: 0.10);
 
     // Skeleton card while loading
     if (_iucnLoading) {
@@ -482,7 +482,7 @@ class _FishDetailPageState extends State<FishDetailPage> {
           decoration: BoxDecoration(
             color: lightColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.35)),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,9 +511,9 @@ class _FishDetailPageState extends State<FishDetailPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
+                      color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: color.withOpacity(0.5)),
+                      border: Border.all(color: color.withValues(alpha: 0.5)),
                     ),
                     child: Text(
                       'IUCN Red List',
@@ -534,7 +534,7 @@ class _FishDetailPageState extends State<FishDetailPage> {
               // Population trend (from live IUCN API)
               if (_iucnData?.populationTrend != null) ...[
                 const SizedBox(height: 10),
-                Divider(color: color.withOpacity(0.25), height: 1),
+                Divider(color: color.withValues(alpha: 0.25), height: 1),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -558,7 +558,7 @@ class _FishDetailPageState extends State<FishDetailPage> {
                   (widget.fish['conservationDetails'] as String)
                       .isNotEmpty) ...[
                 const SizedBox(height: 10),
-                Divider(color: color.withOpacity(0.25), height: 1),
+                Divider(color: color.withValues(alpha: 0.25), height: 1),
                 const SizedBox(height: 10),
                 Text(
                   widget.fish['conservationDetails'],
@@ -640,7 +640,7 @@ class _FishDetailPageState extends State<FishDetailPage> {
                     height: isActive ? 10 : 6,
                     margin: const EdgeInsets.symmetric(horizontal: 1),
                     decoration: BoxDecoration(
-                      color: isActive ? color : color.withOpacity(0.30),
+                      color: isActive ? color : color.withValues(alpha: 0.30),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),

@@ -11,6 +11,18 @@ import 'theme.dart';
 import 'user_sightings_map_screen.dart';
 import 'landing_page.dart';
 
+class AiModelOption {
+  final String label;
+  final String modelId;
+  final String description;
+
+  const AiModelOption({
+    required this.label,
+    required this.modelId,
+    required this.description,
+  });
+}
+
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
 
@@ -19,12 +31,32 @@ class AiChatScreen extends StatefulWidget {
 }
 
 class _AiChatScreenState extends State<AiChatScreen> {
+  static const List<AiModelOption> _modelOptions = [
+    AiModelOption(
+      label: 'Flash-Lite',
+      modelId: 'gemini-2.5-flash-lite',
+      description: 'Fast, lightweight default',
+    ),
+    AiModelOption(
+      label: 'Flash',
+      modelId: 'gemini-2.5-flash',
+      description: 'Balanced speed and quality',
+    ),
+    AiModelOption(
+      label: 'Flash-Lite 2.0',
+      modelId: 'gemini-2.0-flash-lite',
+      description: 'Stable fallback model',
+    ),
+  ];
+
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  AiModelOption _selectedModel = _modelOptions.first;
   bool _isAITyping = false;
+  String? _quotaNotice;
 
   // Track input line count for dynamic expansion
   int _lineCount = 1;
@@ -141,10 +173,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
 
     try {
-      setState(() {
-        _isAITyping = true;
-      });
-
+      // Adds user's message to RTDB
       final newMessageRef = _db.child('chat_sessions/$_userId').push();
       await newMessageRef.set({
         'role': 'user',
@@ -152,6 +181,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
         'timestamp': timestamp,
       });
 
+      await _generateAndSaveResponse(text, newMessageRef.key, apiKey);
+    } catch (e) {
+      _showErrorSnackBar(e);
+    }
+  }
+
+  Future<void> _generateAndSaveResponse(
+    String text,
+    String? currentUserMessageKey,
+    String apiKey,
+  ) async {
+    AiModelOption? retryModel;
+
+    try {
+      setState(() {
+        _isAITyping = true;
+      });
+
+      // Fetch Fish List for RAG (Retrieval-Augmented Generation)
       final fishSnap = await _db.child('fish').get();
       final allFish = fishSnap.value as Map? ?? {};
 
@@ -176,7 +224,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
       final historyList = historyData.entries.toList()
         ..sort((a, b) => (a.value['timestamp'] as int).compareTo(b.value['timestamp'] as int));
 
-      final filteredHistory = historyList.where((e) => e.key != newMessageRef.key).toList();
+      // Filter out the current message to avoid duplication in history
+      final filteredHistory = historyList.where((e) => e.key != currentUserMessageKey).toList();
 
       final List<Content> contentHistory = [];
       String? lastRole;
@@ -190,7 +239,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       final model = GenerativeModel(
-        model: 'gemini-2.5-flash',
+        model: _selectedModel.modelId,
         apiKey: apiKey,
         safetySettings: [
           SafetySetting(HarmCategory.harassment, HarmBlockThreshold.medium),
@@ -218,23 +267,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
 
-      _scrollToBottom();
-
-    } catch (e) {
       if (mounted) {
-        String errorMsg = 'Error: ${e.toString()}';
-        if (e.toString().contains('safety')) {
-          errorMsg = 'The message was blocked by safety filters.';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 6),
-          ),
-        );
+        setState(() {
+          _quotaNotice = null;
+        });
       }
+    } on GenerativeAIException catch (e) {
+      if (_isQuotaError(e)) {
+        if (mounted) {
+          setState(() {
+            _isAITyping = false;
+            _quotaNotice =
+                '${_selectedModel.label} quota was reached. Please choose another model to retry.';
+          });
+          retryModel = await _showQuotaModelPicker();
+        }
+      } else {
+        _showErrorSnackBar(e);
+      }
+    } catch (e) {
+      _showErrorSnackBar(e);
     } finally {
       if (mounted) {
         setState(() {
@@ -243,6 +295,111 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _scrollToBottom();
       }
     }
+
+    if (retryModel != null && mounted) {
+      final previousModel = _selectedModel;
+      setState(() {
+        _selectedModel = retryModel!;
+        _quotaNotice =
+            'Retrying with ${_selectedModel.label} after ${previousModel.label} reached its quota.';
+      });
+      await _generateAndSaveResponse(text, currentUserMessageKey, apiKey);
+    }
+  }
+
+  bool _isQuotaError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('quota') ||
+        message.contains('rate limit') ||
+        message.contains('resource_exhausted') ||
+        message.contains('429') ||
+        message.contains('too many requests');
+  }
+
+  void _showErrorSnackBar(Object error) {
+    if (!mounted) return;
+
+    String errorMsg = 'Error: ${error.toString()}';
+    if (error.toString().toLowerCase().contains('safety')) {
+      errorMsg = 'The message was blocked by safety filters.';
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMsg),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
+
+  Future<AiModelOption?> _showQuotaModelPicker() {
+    final fallbackModels = _modelOptions
+        .where((model) => model.modelId != _selectedModel.modelId)
+        .toList();
+
+    return showModalBottomSheet<AiModelOption>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Model quota reached',
+                  style: TextStyle(
+                    color: kDarkNavy,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_selectedModel.label} is currently unavailable. Choose another model to retry your message.',
+                  style: TextStyle(
+                    color: kDarkNavy.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...fallbackModels.map(
+                  (model) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.auto_awesome, color: kAccentBlue),
+                    title: Text(
+                      model.label,
+                      style: const TextStyle(
+                        color: kDarkNavy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle: Text(model.description),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => Navigator.pop(context, model),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -279,33 +436,60 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Chat Flow - Expanded to fill available space
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, -5),
-                    ),
-                  ],
-                ),
-                child: StreamBuilder(
-                  stream: _db.child('chat_sessions/$_userId').onValue,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: kAccentBlue));
-                    }
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Greeting Section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+            child: Text(
+              'Hi, ${userName[0].toUpperCase()}${userName.substring(1)}!',
+              style: const TextStyle(
+                color: kDarkNavy,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
 
-                    // Build header (greeting + shortcuts) as a sliver so it
-                    // scrolls away naturally when the keyboard appears.
-                    final header = SliverToBoxAdapter(
+          // Shortcut Buttons Row
+          _buildShortcutsRow(),
+
+          const SizedBox(height: 12),
+
+          _buildModelSelector(),
+
+          if (_quotaNotice != null) ...[
+            const SizedBox(height: 10),
+            _buildQuotaNotice(),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Chat Flow
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: StreamBuilder(
+                stream: _db.child('chat_sessions/$_userId').onValue,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: kAccentBlue));
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+                    return Center(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -430,8 +614,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final shortcuts = [
       {'label': 'Identify Fish', 'icon': Icons.search},
       {'label': 'Log Sighting', 'icon': Icons.add_location_alt},
-      {'label': 'Nearby Sightings', 'icon': Icons.map},
-      {'label': 'My Logbook', 'icon': Icons.book},
       {'label': 'Browse Index', 'icon': Icons.list_alt},
     ];
 
@@ -460,6 +642,72 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  Widget _buildModelSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              size: 16,
+              color: _isAITyping ? Colors.grey : kAccentBlue,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Model: ${_selectedModel.label}',
+              style: TextStyle(
+                color: _isAITyping ? Colors.grey : kDarkNavy,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuotaNotice() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _quotaNotice!,
+                style: const TextStyle(
+                  color: kDarkNavy,
+                  fontSize: 13,
+                  height: 1.3,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleShortcut(String label) {
     switch (label) {
       case 'Identify Fish':
@@ -470,8 +718,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _focusNode.requestFocus();
         break;
       case 'Log Sighting':
-      case 'Nearby Sightings':
-      case 'My Logbook':
         Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSightingsMapScreen()));
         break;
       case 'Browse Index':

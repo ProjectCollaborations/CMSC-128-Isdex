@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 
@@ -88,8 +89,7 @@ class IucnService {
     // 2. Token guard — degrade gracefully if not injected at build time
     if (!AppConfig.hasIucnToken) {
       assert(() {
-        // ignore: avoid_print
-        print('[IucnService] IUCN_API_TOKEN not set. '
+        debugPrint('[IucnService] IUCN_API_TOKEN not set. '
             'Run with: flutter run --dart-define=IUCN_API_TOKEN=your_token');
         return true;
       }());
@@ -109,8 +109,7 @@ class IucnService {
 
       if (response.statusCode == 401) {
         assert(() {
-          // ignore: avoid_print
-          print('[IucnService] 401 Unauthorized — check your IUCN_API_TOKEN.');
+          debugPrint('[IucnService] 401 Unauthorized — check your IUCN_API_TOKEN.');
           return true;
         }());
         return IucnResult.unknown;
@@ -118,8 +117,7 @@ class IucnService {
 
       if (response.statusCode != 200) {
         assert(() {
-          // ignore: avoid_print
-          print('[IucnService] HTTP ${response.statusCode} for "$key"');
+          debugPrint('[IucnService] HTTP ${response.statusCode} for "$key"');
           return true;
         }());
         return IucnResult.unknown;
@@ -138,8 +136,7 @@ class IucnService {
       return iucnResult;
     } catch (e) {
       assert(() {
-        // ignore: avoid_print
-        print('[IucnService] Error fetching "$key": $e');
+        debugPrint('[IucnService] Error fetching "$key": $e');
         return true;
       }());
       return IucnResult.unknown;
