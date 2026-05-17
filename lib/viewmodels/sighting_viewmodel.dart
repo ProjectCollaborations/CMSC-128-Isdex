@@ -11,6 +11,7 @@ class SightingViewModel extends ChangeNotifier {
   
   // State
   List<Sighting> _userSightings = [];
+  List<Sighting> _allSightings = [];  // NEW: all sightings (for filtering in UI)
   List<Sighting> _publicSightings = [];
   bool _isLoading = true;
   String? _error;
@@ -18,17 +19,26 @@ class SightingViewModel extends ChangeNotifier {
   
   // Getters
   List<Sighting> get userSightings => _userSightings;
+  List<Sighting> get allSightings => _allSightings;  // NEW
   List<Sighting> get publicSightings => _publicSightings;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isSubmitting => _isSubmitting;
   
   void _init() {
-    // Listen to public sightings (approved only)
-    _repository.watchApprovedSightings().listen((sightings) {
-      _publicSightings = sightings;
+    // Listen to ALL sightings (not just approved)
+    _repository.watchAllSightings().listen((sightings) {
+      _allSightings = sightings;
+      
+      // For backward compatibility, keep publicSightings as verified only
+      // (other parts of the app might expect this)
+      _publicSightings = sightings.where((s) => s.status == SightingStatus.verified).toList();
+      
+      _isLoading = false;
+      _error = null;
       notifyListeners();
     }, onError: (error) {
+      _isLoading = false;
       _error = error.toString();
       notifyListeners();
     });

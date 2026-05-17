@@ -47,7 +47,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   }
 
   void _listenToViewModels() {
-    // Listen to public sightings (approved only)
+    // Rebuild markers whenever sightings change (covers verified + own pending)
     _sightingViewModel.addListener(_rebuildMarkers);
     
     // Load fish list for dropdown
@@ -59,22 +59,32 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   }
   
   void _updateFishList() {
-    setState(() {
-      _fishList = _fishViewModel.filteredFish;
-    });
+    if (mounted) {
+      setState(() {
+        _fishList = _fishViewModel.filteredFish;
+      });
+    }
   }
 
   void _rebuildMarkers() {
-    final sightings = _sightingViewModel.publicSightings;
+    if (!mounted) return;
+    
+    // Use allSightings so we can access the current user's pending pins.
+    // publicSightings only contains verified ones, which would hide the
+    // owner's own pending submissions from the map entirely.
+    final sightings = _sightingViewModel.allSightings;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final markers = <Marker>[];
     
     for (final sighting in sightings) {
-      final isOwner = sighting.userId == FirebaseAuth.instance.currentUser?.uid;
+      final isOwner = sighting.userId == currentUserId;
       
-      // Only show approved sightings OR user's own pending sightings
-      if (sighting.status != SightingStatus.verified && !isOwner) {
-        continue;
-      }
+      // Show verified sightings to everyone.
+      // Show pending sightings ONLY to the user who submitted them.
+      // Rejected/archived sightings are never shown on the map.
+      final isVisible = sighting.status == SightingStatus.verified ||
+          (sighting.status == SightingStatus.pending && isOwner);
+      if (!isVisible) continue;
       
       final pinColor = sighting.status == SightingStatus.pending 
           ? Colors.orange 
@@ -103,6 +113,19 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (sighting.status == SightingStatus.pending && isOwner)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'PENDING',
+                      style: TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -110,14 +133,27 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       );
     }
     
-    setState(() {
-      _markers = markers;
-    });
+    if (mounted) {
+      setState(() {
+        _markers = markers;
+      });
+    }
   }
 
   Future<void> _showSightingDetails(Sighting sighting) async {
-    final isOwner = sighting.userId == FirebaseAuth.instance.currentUser?.uid;
-    
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final isOwner = sighting.userId == currentUserId;
+
+    // Pending pins owned by the current user skip the action menu entirely —
+    // tapping the pin goes straight to a details sheet with a delete button.
+    if (isOwner && sighting.status == SightingStatus.pending) {
+      await _showPendingSightingSheet(sighting);
+      return;
+    }
+
+    // Store scaffold messenger state BEFORE async operations to avoid deactivation errors
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     final action = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -128,14 +164,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
-              sighting.status == SightingStatus.pending
-                  ? 'Status: Pending Moderator Approval'
-                  : 'User-submitted sighting. May not be scientifically verified.',
+              'User-submitted sighting. May not be scientifically verified.',
               style: TextStyle(
                 fontSize: 13,
-                color: sighting.status == SightingStatus.pending 
-                    ? Colors.orange[700] 
-                    : Colors.grey[700],
+                color: Colors.grey[700],
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -156,9 +188,11 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
     if (action == 'viewFish') {
       if (sighting.fishId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This sighting is not linked to a fish.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This sighting is not linked to a fish.')),
+          );
+        }
         return;
       }
       final fish = await _mapViewModel.getFishById(sighting.fishId);
@@ -207,7 +241,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
-                      'Near ${sighting.latitude.toStringAsFixed(2)}°, ${sighting.longitude.toStringAsFixed(2)}°',
+                      'Near ${sighting.latitude.toStringAsFixed(5)}°, ${sighting.longitude.toStringAsFixed(5)}°',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],
@@ -218,26 +252,8 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   const SizedBox(height: 4),
                   Text(sighting.notes, style: const TextStyle(fontSize: 15)),
                 ],
-                const SizedBox(height: 12),
-                if (isOwner)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await _sightingViewModel.deleteSighting(sighting.id);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Sighting deleted')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.delete, color: Colors.red, size: 22),
-                      label: const Text('Delete this pin',
-                          style: TextStyle(color: Colors.red, fontSize: 14)),
-                    ),
-                  )
-                else if (sighting.status == SightingStatus.verified)
+                if (!isOwner && sighting.status == SightingStatus.verified) ...[
+                  const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -258,12 +274,154 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                           style: TextStyle(color: Colors.orange, fontSize: 14)),
                     ),
                   ),
+                ],
               ],
             ),
           ),
         ),
       );
     }
+  }
+
+  /// Shows a bottom sheet for the current user's own pending sighting.
+  /// Displays the sighting details and a prominent delete button — no
+  /// intermediate action menu required.
+  Future<void> _showPendingSightingSheet(Sighting sighting) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row: fish name + PENDING badge
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(sighting.fishName,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'PENDING',
+                      style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Awaiting moderator approval',
+                style: TextStyle(fontSize: 13, color: Colors.orange[700], fontStyle: FontStyle.italic),
+              ),
+              const SizedBox(height: 10),
+              // Submitted by
+              Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Submitted by you',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Coordinates
+              Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Near ${sighting.latitude.toStringAsFixed(5)}°, ${sighting.longitude.toStringAsFixed(5)}°',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+              if (sighting.notes.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text('Notes:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(sighting.notes, style: const TextStyle(fontSize: 15)),
+              ],
+              const SizedBox(height: 16),
+              // Delete button — full width, prominent
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete this pin', style: TextStyle(fontSize: 15)),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final confirmed = await _confirmDelete(context, sighting.fishName);
+                    if (confirmed == true) {
+                      final success = await _sightingViewModel.deleteSighting(sighting.id);
+                      if (mounted) {
+                        if (success) {
+                          scaffoldMessenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Sighting deleted successfully'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          _rebuildMarkers();
+                        } else {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text(_sightingViewModel.error ?? 'Failed to delete sighting'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _confirmDelete(BuildContext context, String fishName) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Sighting'),
+        content: Text('Are you sure you want to delete the sighting of "$fishName"?\nThis cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _getUserLocationOnStartup() async {
@@ -290,16 +448,20 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   Future<void> _startAddSighting() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to add a sighting.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You must be logged in to add a sighting.')),
+        );
+      }
       return;
     }
 
     if (_fishList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Loading fish list, please wait...')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Loading fish list, please wait...')),
+        );
+      }
       return;
     }
 
@@ -348,108 +510,254 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     final notesController = TextEditingController();
     bool isAnonymous = false;
 
-    final confirmed = await showDialog<bool>(
+    final String authorName = user.displayName?.isNotEmpty == true
+        ? user.displayName!
+        : user.email?.split('@')[0] ?? 'You';
+
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('Add Sighting'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        builder: (context, setStateSheet) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SafeArea(
+              minimum: const EdgeInsets.only(bottom: 12),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.my_location, size: 16, color: Colors.blue),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text(
-                        'Using your current GPS location',
-                        style: TextStyle(fontSize: 13, color: Colors.blue),
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
+                    ),
+
+                    // Title + GPS badge
+                    Row(
+                      children: [
+                        const Icon(Icons.add_location_alt, color: Colors.blue, size: 22),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Add Sighting',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.my_location, size: 12, color: Colors.blue.shade700),
+                              const SizedBox(width: 4),
+                              Text(
+                                'GPS',
+                                style: TextStyle(fontSize: 11, color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Fish selector
+                    const Text(
+                      'Fish species',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () async {
+                        final fish = await _showFishPickerSheet(context);
+                        if (fish != null) setStateSheet(() => selectedFish = fish);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: selectedFish != null ? Colors.blue : Colors.grey.shade400,
+                            width: selectedFish != null ? 1.5 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          color: selectedFish != null ? Colors.blue.shade50 : Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selectedFish != null ? Icons.check_circle : Icons.search,
+                              size: 18,
+                              color: selectedFish != null ? Colors.blue : Colors.grey,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                selectedFish?.commonName ?? 'Search and select a fish…',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: selectedFish != null ? Colors.blue.shade800 : Colors.grey.shade500,
+                                  fontWeight: selectedFish != null ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                            if (selectedFish != null)
+                              GestureDetector(
+                                onTap: () => setStateSheet(() => selectedFish = null),
+                                child: Icon(Icons.close, size: 16, color: Colors.blue.shade400),
+                              )
+                            else
+                              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (selectedFish != null &&
+                        selectedFish!.scientificName.isNotEmpty &&
+                        selectedFish!.scientificName != 'N/A')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, left: 2),
+                        child: Text(
+                          selectedFish!.scientificName,
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+
+                    // Notes field
+                    const Text(
+                      'Notes',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesController,
+                      decoration: InputDecoration(
+                        hintText: 'Describe what you saw (optional)',
+                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Colors.blue, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Anonymous toggle
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isAnonymous ? Colors.orange.shade50 : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isAnonymous ? Colors.orange.shade200 : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: SwitchListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.only(left: 14, right: 8),
+                        title: Text(
+                          'Post anonymously',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isAnonymous ? Colors.orange.shade800 : Colors.black87,
+                          ),
+                        ),
+                        subtitle: Text(
+                          isAnonymous ? 'Your name will be hidden' : 'Shown as: $authorName',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isAnonymous ? Colors.orange.shade600 : Colors.grey[500],
+                          ),
+                        ),
+                        secondary: Icon(
+                          isAnonymous ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: isAnonymous ? Colors.orange.shade600 : Colors.grey,
+                          size: 20,
+                        ),
+                        value: isAnonymous,
+                        activeColor: Colors.orange.shade600,
+                        onChanged: (val) => setStateSheet(() => isAnonymous = val),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              side: BorderSide(color: Colors.grey.shade300),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: selectedFish == null
+                                ? null
+                                : () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              disabledBackgroundColor: Colors.grey.shade200,
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Submit Sighting',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Text('Fish (common name)', style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 4),
-                DropdownButtonFormField<Fish>(
-                  value: selectedFish,
-                  items: _fishList.map((f) => DropdownMenuItem<Fish>(
-                    value: f,
-                    child: Text(f.commonName),
-                  )).toList(),
-                  onChanged: (value) => setStateDialog(() => selectedFish = value),
-                  decoration: const InputDecoration(
-                    hintText: 'Select fish',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: SwitchListTile(
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    title: const Text('Post anonymously', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                    subtitle: Text(
-                      isAnonymous
-                          ? 'Your name will not be shown'
-                          : 'Shown as: ${user.displayName?.isNotEmpty == true ? user.displayName! : user.email?.split('@')[0] ?? 'You'}',
-                      style: TextStyle(fontSize: 12, color: isAnonymous ? Colors.orange[700] : Colors.grey[600]),
-                    ),
-                    secondary: Icon(isAnonymous ? Icons.visibility_off : Icons.visibility, color: isAnonymous ? Colors.orange[700] : Colors.blue),
-                    value: isAnonymous,
-                    activeThumbColor: Colors.orange[700],
-                    onChanged: (val) => setStateDialog(() => isAnonymous = val),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (selectedFish == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select a fish first.')),
-                  );
-                  return;
-                }
-                Navigator.pop(context, true);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
     if (confirmed != true || selectedFish == null) return;
 
-    // Extract to local variable after null check
     final fish = selectedFish!;
 
-    // Resolve display name based on toggle
-    final String displayName = isAnonymous
-        ? 'Anonymous'
-        : (user.displayName?.isNotEmpty == true
-            ? user.displayName!
-            : user.email?.split('@')[0] ?? 'Anonymous');
+    final String displayName = isAnonymous ? 'Anonymous' : authorName;
 
     final sighting = Sighting(
       id: '',
@@ -486,6 +794,150 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         SnackBar(content: Text(_sightingViewModel.error!), backgroundColor: Colors.red),
       );
     }
+  }
+
+
+  /// Searchable fish picker sheet. Returns the selected [Fish] or null if dismissed.
+  Future<Fish?> _showFishPickerSheet(BuildContext parentContext) async {
+    final searchController = TextEditingController();
+    List<Fish> filtered = List.from(_fishList);
+
+    return showModalBottomSheet<Fish>(
+      context: parentContext,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStatepicker) {
+          void onSearch(String query) {
+            final q = query.toLowerCase().trim();
+            setStatepicker(() {
+              filtered = q.isEmpty
+                  ? List.from(_fishList)
+                  : _fishList.where((f) =>
+                      f.commonName.toLowerCase().contains(q) ||
+                      f.scientificName.toLowerCase().contains(q) ||
+                      f.localName.toLowerCase().contains(q),
+                    ).toList();
+            });
+          }
+
+          return SizedBox(
+            height: MediaQuery.of(context).size.height * 0.75,
+            child: Column(
+              children: [
+                // Handle + header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                  child: Column(
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          const Text(
+                            'Select Fish',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () => Navigator.pop(context),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Search bar
+                      TextField(
+                        controller: searchController,
+                        autofocus: true,
+                        onChanged: onSearch,
+                        decoration: InputDecoration(
+                          hintText: 'Search by name…',
+                          hintStyle: TextStyle(color: Colors.grey.shade400),
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    searchController.clear();
+                                    onSearch('');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Results list
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off, size: 40, color: Colors.grey.shade300),
+                              const SizedBox(height: 8),
+                              Text(
+                                'No fish found',
+                                style: TextStyle(color: Colors.grey.shade400, fontSize: 15),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
+                          itemBuilder: (context, index) {
+                            final fish = filtered[index];
+                            return ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                              title: Text(
+                                fish.commonName,
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                              ),
+                              subtitle: fish.scientificName.isNotEmpty && fish.scientificName != 'N/A'
+                                  ? Text(
+                                      fish.scientificName,
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                                    )
+                                  : null,
+                              trailing: const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                              onTap: () => Navigator.pop(context, fish),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
