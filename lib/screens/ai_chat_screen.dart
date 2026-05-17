@@ -55,6 +55,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
   AiModelOption _selectedModel = _modelOptions.first;
   bool _isAITyping = false;
+  String? _quotaNotice;
 
   Future<void> _clearChat() async {
     if (_userId.isEmpty) return;
@@ -216,11 +217,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
         'content': responseText,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
+
+      if (mounted) {
+        setState(() {
+          _quotaNotice = null;
+        });
+      }
     } on GenerativeAIException catch (e) {
       if (_isQuotaError(e)) {
         if (mounted) {
           setState(() {
             _isAITyping = false;
+            _quotaNotice =
+                '${_selectedModel.label} quota was reached. Please choose another model to retry.';
           });
           retryModel = await _showQuotaModelPicker();
         }
@@ -238,8 +247,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
 
     if (retryModel != null && mounted) {
+      final previousModel = _selectedModel;
       setState(() {
         _selectedModel = retryModel!;
+        _quotaNotice =
+            'Retrying with ${_selectedModel.label} after ${previousModel.label} reached its quota.';
       });
       await _generateAndSaveResponse(text, currentUserMessageKey, apiKey);
     }
@@ -396,6 +408,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
           _buildModelSelector(),
 
+          if (_quotaNotice != null) ...[
+            const SizedBox(height: 10),
+            _buildQuotaNotice(),
+          ],
+
           const SizedBox(height: 16),
 
           // Chat Flow
@@ -536,68 +553,64 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget _buildModelSelector() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: PopupMenuButton<AiModelOption>(
-        enabled: !_isAITyping,
-        initialValue: _selectedModel,
-        onSelected: (model) {
-          setState(() {
-            _selectedModel = model;
-          });
-        },
-        itemBuilder: (context) {
-          return _modelOptions.map((model) {
-            return PopupMenuItem<AiModelOption>(
-              value: model,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(
-                  model.label,
-                  style: const TextStyle(
-                    color: kDarkNavy,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                subtitle: Text(model.description),
-                trailing: model.modelId == _selectedModel.modelId
-                    ? const Icon(Icons.check, color: kAccentBlue)
-                    : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              size: 16,
+              color: _isAITyping ? Colors.grey : kAccentBlue,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Model: ${_selectedModel.label}',
+              style: TextStyle(
+                color: _isAITyping ? Colors.grey : kDarkNavy,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
-            );
-          }).toList();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: _isAITyping ? Colors.grey : kAccentBlue,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Model: ${_selectedModel.label}',
-                style: TextStyle(
-                  color: _isAITyping ? Colors.grey : kDarkNavy,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuotaNotice() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _quotaNotice!,
+                style: const TextStyle(
+                  color: kDarkNavy,
                   fontSize: 13,
+                  height: 1.3,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: 6),
-              Icon(
-                Icons.expand_more,
-                size: 18,
-                color: _isAITyping ? Colors.grey : kDarkNavy,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
