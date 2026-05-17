@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'map_screen.dart';
 import '../services/iucn_service.dart';
 
@@ -12,6 +14,9 @@ class FishDetailPage extends StatefulWidget {
 }
 
 class _FishDetailPageState extends State<FishDetailPage> {
+  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  final User? _user = FirebaseAuth.instance.currentUser;
+  bool _isFavorite = false;
   // ── IUCN status → color mapping ───────────────────────────────────────────
   static const Map<String, Color> _statusColors = {
     'Extinct (EX)':               Color(0xFF000000),
@@ -46,6 +51,57 @@ class _FishDetailPageState extends State<FishDetailPage> {
   void initState() {
     super.initState();
     _loadIucnStatus();
+    _checkFavoriteStatus();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (_user == null) return;
+    final fishId = widget.fish['fishId']?.toString();
+    if (fishId == null) return;
+
+    final snap = await _db.child('users/${_user.uid}/favorites/$fishId').get();
+    if (mounted) {
+      setState(() {
+        _isFavorite = snap.exists && snap.value == true;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to favorite fish')),
+      );
+      return;
+    }
+
+    final fishId = widget.fish['fishId']?.toString();
+    if (fishId == null) return;
+
+    final newStatus = !_isFavorite;
+    try {
+      if (newStatus) {
+        await _db.child('users/${_user.uid}/favorites/$fishId').set(true);
+      } else {
+        await _db.child('users/${_user.uid}/favorites/$fishId').remove();
+      }
+
+      if (mounted) {
+        setState(() => _isFavorite = newStatus);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newStatus ? 'Added to favorites' : 'Removed from favorites'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _loadIucnStatus() async {
