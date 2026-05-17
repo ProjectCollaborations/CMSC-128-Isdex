@@ -235,7 +235,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     final fish = catalogVm.filteredFish[index];
                     return _FishCard(
                       fish: fish,
-                      onTap: () => context.go('/fish/${fish.id}'),
+                      onTap: () => context.push('/fish/${fish.id}'),
                     );
                   },
                 ),

@@ -201,7 +201,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   }
 
   void _navigateToFishDetail(Fish fish) {
-    context.go('/fish/${fish.id}');
+    context.push('/fish/${fish.id}');
   }
 
   @override

@@ -413,7 +413,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         );
         return;
       }
-      if (mounted) context.go('/fish/${sighting.fishId}');
+      if (mounted) context.push('/fish/${sighting.fishId}');
       return;
     }
 

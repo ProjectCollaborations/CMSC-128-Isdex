@@ -145,7 +145,7 @@ class _MapScreenState extends State<MapScreen> {
       child: GestureDetector(
         onTap: () {
           if (loc.fishId.isNotEmpty) {
-            context.go('/fish/${loc.fishId}');
+            context.push('/fish/${loc.fishId}');
           }
         },
         child: Column(
