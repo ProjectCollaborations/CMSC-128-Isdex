@@ -1,133 +1,85 @@
 import 'package:flutter/material.dart';
-import 'theme.dart';
-import 'signup_page.dart';
-import '../services/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../core/constants/app_theme.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final AuthService _authService = AuthService();
+class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
 
   Future<void> _handleLogin() async {
     if (_emailController.text.trim().isEmpty) {
       _showError('Please enter your email');
       return;
     }
-
     if (_passwordController.text.trim().isEmpty) {
       _showError('Please enter your password');
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authVm = context.read<AuthViewModel>();
+    await authVm.signIn(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
 
-    try {
-      await _authService.signInWithEmail(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
+    if (!mounted) return;
+    if (authVm.error != null) {
+      _showError(authVm.error!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logged in successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
-
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logged in successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      _showError(_getErrorMessage(e.toString()));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleForgotPassword() async {
     final email = _emailController.text.trim().toLowerCase();
-
     if (email.isEmpty) {
       _showError('Please enter your email address');
       return;
     }
-
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
     if (!emailRegex.hasMatch(email)) {
       _showError('Please enter a valid email address');
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authVm = context.read<AuthViewModel>();
+    final exists = await authVm.isEmailRegistered(email);
+    if (!exists) {
+      _showError('No account found with this email.');
+      return;
+    }
 
-    try {
-      final exists = await _authService.isEmailRegisteredInAppDb(email);
-      if (!exists) {
-        _showError('No account found with this email.');
-        return;
-      }
-
-      await _authService.resetPassword(email);
-
-      if (!mounted) return;
+    await authVm.resetPassword(email);
+    if (!mounted) return;
+    if (authVm.error != null) {
+      _showError(authVm.error!);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password reset email sent! Check your inbox.'),
           backgroundColor: Colors.green,
         ),
       );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-
-      final msg = switch (e.code) {
-        'invalid-email' => 'Invalid email address',
-        'too-many-requests' => 'Too many attempts. Try again later.',
-        'network-request-failed' => 'Network error. Check your connection.',
-        _ => 'Failed to send reset email. Please try again.',
-      };
-
-      _showError(msg);
-    } catch (_) {
-      if (!mounted) return;
-      _showError('Failed to send reset email. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  String _getErrorMessage(String error) {
-    if (error.contains('user-not-found')) {
-      return 'No account found with this email';
-    } else if (error.contains('wrong-password')) {
-      return 'Incorrect password';
-    } else if (error.contains('invalid-email')) {
-      return 'Invalid email address';
-    } else if (error.contains('user-disabled')) {
-      return 'This account has been disabled';
-    } else if (error.contains('too-many-requests')) {
-      return 'Too many failed attempts. Try again later';
-    } else if (error.contains('network-request-failed')) {
-      return 'Network error. Please check your connection';
-    } else if (error.contains('invalid-credential')) {
-      return 'Invalid email or password';
-    }
-    return 'Login failed. Please try again';
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -140,8 +92,10 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final authVm = context.watch<AuthViewModel>();
+
     return Scaffold(
-      backgroundColor: kBackground,
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -150,7 +104,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: kBackground,
+                  color: AppTheme.background,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
@@ -159,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                     Row(
                       children: [
                         IconButton(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => context.go('/'),
                           icon: const Icon(Icons.arrow_back, color: Colors.blue),
                           style: IconButton.styleFrom(
                             backgroundColor: Colors.blue[50],
@@ -171,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               Container(
                                 decoration: BoxDecoration(
-                                  color: kBackground,
+                                  color: AppTheme.background,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 padding: const EdgeInsets.all(8),
@@ -181,11 +135,11 @@ class _LoginPageState extends State<LoginPage> {
                                   width: 40,
                                 ),
                               ),
-                              SizedBox(width: 8),
-                              Text(
+                              const SizedBox(width: 8),
+                              const Text(
                                 'IsDex',
                                 style: TextStyle(
-                                  color: kDarkNavy,
+                                  color: AppTheme.darkNavy,
                                   fontSize: 28,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -198,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 24),
                     Container(
                       decoration: BoxDecoration(
-                        color: kLightBlue,
+                        color: AppTheme.lightBlue,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -211,7 +165,7 @@ class _LoginPageState extends State<LoginPage> {
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
-                                color: kDarkNavy,
+                                color: AppTheme.darkNavy,
                               ),
                             ),
                           ),
@@ -219,7 +173,7 @@ class _LoginPageState extends State<LoginPage> {
                           const Text(
                             'Email',
                             style: TextStyle(
-                              color: kDarkNavy,
+                              color: AppTheme.darkNavy,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -241,7 +195,7 @@ class _LoginPageState extends State<LoginPage> {
                           const Text(
                             'Password',
                             style: TextStyle(
-                              color: kDarkNavy,
+                              color: AppTheme.darkNavy,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -263,27 +217,27 @@ class _LoginPageState extends State<LoginPage> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleLogin,
+                              onPressed: authVm.isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: kAccentBlue,
+                                backgroundColor: AppTheme.accentBlue,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: _isLoading
+                              child: authVm.isLoading
                                   ? const SizedBox(
                                       height: 20,
                                       width: 20,
                                       child: CircularProgressIndicator(
-                                        color: kDarkNavy,
+                                        color: AppTheme.darkNavy,
                                         strokeWidth: 2,
                                       ),
                                     )
                                   : const Text(
                                       'Log In',
                                       style: TextStyle(
-                                        color: kDarkNavy,
+                                        color: AppTheme.darkNavy,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -299,8 +253,8 @@ class _LoginPageState extends State<LoginPage> {
                           child: OutlinedButton(
                             onPressed: _handleForgotPassword,
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: kDarkNavy,
-                              side: const BorderSide(color: kDarkNavy),
+                              foregroundColor: AppTheme.darkNavy,
+                              side: const BorderSide(color: AppTheme.darkNavy),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -312,17 +266,10 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SignUpPage(),
-                                ),
-                              );
-                            },
+                            onPressed: () => context.go('/signup'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: kDarkNavy,
-                              side: const BorderSide(color: kDarkNavy),
+                              foregroundColor: AppTheme.darkNavy,
+                              side: const BorderSide(color: AppTheme.darkNavy),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),

@@ -4,7 +4,9 @@ import 'package:firebase_database/firebase_database.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  final DatabaseReference _db;
+
+  AuthService(this._db);
 
   // Get current user
   User? get currentUser => _auth.currentUser;

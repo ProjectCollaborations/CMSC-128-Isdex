@@ -78,6 +78,18 @@ lib/generated_plugin_registrant.dart
 google-services.json
 GoogleService-Info.plist
 
+# ── Agent tooling ─────────────────────────────────────────────────
+.opencode/
+.memsearch/
+AGENTS.md
+AGENTS-ARCHITECTURE.md
+docs/superpowers/
+
+# ── Test artifacts / screenshots ──────────────────────────────────
+flutter_*.png
+flutter_*.jpg
+devtools_options.yaml
+
 # ── Misc / OS ─────────────────────────────────────────────────────
 .env
 *.DS_Store
