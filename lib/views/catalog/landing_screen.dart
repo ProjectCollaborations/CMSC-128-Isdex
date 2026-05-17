@@ -178,10 +178,7 @@ class _LandingScreenState extends State<LandingScreen> {
               icon: const Icon(Icons.camera_alt, color: Colors.blue),
               tooltip: 'Search by photo',
               onPressed: () {
-                context.push(
-                  '/fish-search',
-                  extra: {'allSpecies': catalogVm.allFish},
-                );
+                context.push('/fish-search');
               },
             ),
           ),

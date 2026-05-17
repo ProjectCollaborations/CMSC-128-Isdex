@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'theme.dart';
 import 'user_sightings_map_screen.dart';
-import 'landing_page.dart';
+import 'package:go_router/go_router.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -475,11 +475,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSightingsMapScreen()));
         break;
       case 'Browse Index':
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LandingPage()),
-          (route) => false,
-        );
+        context.go('/');
         break;
     }
   }

@@ -9,6 +9,8 @@ import '../repositories/chat_repository.dart';
 import '../repositories/user_repository.dart';
 import '../services/auth_service.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../viewmodels/fish_catalog_viewmodel.dart';
+import '../viewmodels/fish_detail_viewmodel.dart';
 import 'router.dart';
 
 class IsDexApp extends StatefulWidget {
@@ -48,6 +50,16 @@ class _IsDexAppState extends State<IsDexApp> {
         Provider(create: (_) => ChatRepository(_db)),
         Provider(create: (_) => UserRepository(_db)),
         ChangeNotifierProvider<AuthViewModel>.value(value: _authVm),
+        ChangeNotifierProvider(
+          create: (ctx) => FishCatalogViewModel(
+            () => ctx.read<FishRepository>().watchAll(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => FishDetailViewModel(
+            (id) => ctx.read<FishRepository>().getById(id),
+          ),
+        ),
       ],
       child: MaterialApp.router(
         title: 'IsDex',

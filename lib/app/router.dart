@@ -1,7 +1,10 @@
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/auth_viewmodel.dart';
-import '../screens/landing_page.dart';
+import '../viewmodels/fish_catalog_viewmodel.dart';
+import '../views/catalog/landing_screen.dart';
+import '../views/catalog/fish_detail_screen.dart';
+import '../views/catalog/fish_image_search_screen.dart';
 import '../views/auth/login_screen.dart';
 import '../views/auth/signup_screen.dart';
 import '../views/auth/splash_screen.dart';
@@ -40,7 +43,21 @@ GoRouter createRouter(AuthViewModel authVm) {
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) => const LandingPage(),
+        builder: (context, state) => const LandingScreen(),
+      ),
+      GoRoute(
+        path: '/fish/:id',
+        builder: (context, state) {
+          final fishId = state.pathParameters['id']!;
+          return FishDetailScreen(fishId: fishId);
+        },
+      ),
+      GoRoute(
+        path: '/fish-search',
+        builder: (context, state) {
+          final allFish = context.read<FishCatalogViewModel>().allFish;
+          return FishImageSearchScreen(allSpecies: allFish);
+        },
       ),
     ],
   );
