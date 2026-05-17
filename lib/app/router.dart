@@ -10,6 +10,9 @@ import '../views/sighting/user_sightings_map_screen.dart';
 import '../views/auth/login_screen.dart';
 import '../views/auth/signup_screen.dart';
 import '../views/auth/splash_screen.dart';
+import '../views/community/community_screen.dart';
+import '../views/community/comments_screen.dart';
+import '../views/chat/chat_screen.dart';
 
 GoRouter createRouter(AuthViewModel authVm) {
   return GoRouter(
@@ -76,6 +79,21 @@ GoRouter createRouter(AuthViewModel authVm) {
       GoRoute(
         path: '/sighting',
         builder: (context, state) => const UserSightingsMapScreen(),
+      ),
+      GoRoute(
+        path: '/community',
+        builder: (context, state) => const CommunityScreen(),
+      ),
+      GoRoute(
+        path: '/comments/:postId',
+        builder: (context, state) {
+          final postId = state.pathParameters['postId']!;
+          return CommentsScreen(postId: postId);
+        },
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const ChatScreen(),
       ),
     ],
   );

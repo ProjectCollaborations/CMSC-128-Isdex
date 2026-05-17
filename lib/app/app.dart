@@ -10,6 +10,8 @@ import '../repositories/user_repository.dart';
 import '../repositories/map_repository.dart';
 import '../services/auth_service.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import '../viewmodels/chat_viewmodel.dart';
+import '../viewmodels/community_viewmodel.dart';
 import '../viewmodels/fish_catalog_viewmodel.dart';
 import '../viewmodels/fish_detail_viewmodel.dart';
 import 'router.dart';
@@ -60,6 +62,31 @@ class _IsDexAppState extends State<IsDexApp> {
         ChangeNotifierProvider(
           create: (ctx) => FishDetailViewModel(
             (id) => ctx.read<FishRepository>().getById(id),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => ChatViewModel(
+            watchMessages: (uid) => ctx.read<ChatRepository>().watchMessages(uid),
+            addMessage: (uid, {required role, required content}) =>
+                ctx.read<ChatRepository>().addMessage(uid, role: role, content: content),
+            addModelMessage: (uid, {required content}) =>
+                ctx.read<ChatRepository>().addModelMessage(uid, content: content),
+            clearHistory: (uid) => ctx.read<ChatRepository>().clearHistory(uid),
+            currentUserId: () => ctx.read<AuthViewModel>().user?.uid,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => CommunityViewModel(
+            watchPosts: () => ctx.read<CommunityRepository>().watchPosts(),
+            watchComments: (postId) => ctx.read<CommunityRepository>().watchComments(postId),
+            addPost: ({required uid, required username, required caption, required imageBase64}) =>
+                ctx.read<CommunityRepository>().addPost(uid: uid, username: username, caption: caption, imageBase64: imageBase64),
+            toggleLike: (postId, uid) => ctx.read<CommunityRepository>().toggleLike(postId, uid),
+            isLikedBy: (postId, uid) => ctx.read<CommunityRepository>().isLikedBy(postId, uid),
+            reportPost: (postId) => ctx.read<CommunityRepository>().reportPost(postId),
+            deletePost: (postId) => ctx.read<CommunityRepository>().deletePost(postId),
+            currentUserId: () => ctx.read<AuthViewModel>().user?.uid,
+            currentUserDisplay: () => ctx.read<AuthViewModel>().user?.username ?? ctx.read<AuthViewModel>().user?.email ?? '',
           ),
         ),
       ],

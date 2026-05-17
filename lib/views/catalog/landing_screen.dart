@@ -4,8 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../viewmodels/fish_catalog_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/fish.dart';
-import '../../screens/community_page.dart';
-import '../../screens/ai_chat_screen.dart';
+
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -257,12 +256,7 @@ class _LandingScreenState extends State<LandingScreen> {
           if (authVm.isLoggedIn)
             IconButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CommunityPage(),
-                  ),
-                );
+                context.push('/community');
               },
               icon: Icon(Icons.people, color: Colors.grey[400], size: 28),
             ),
@@ -289,12 +283,7 @@ class _LandingScreenState extends State<LandingScreen> {
           if (authVm.isLoggedIn)
             IconButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AiChatScreen(),
-                  ),
-                );
+                context.push('/chat');
               },
               icon: Icon(
                 Icons.auto_awesome,

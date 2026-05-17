@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:provider/provider.dart';
+import '../../repositories/community_repository.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
-class CommentsPage extends StatelessWidget {
+class CommentsScreen extends StatelessWidget {
   final String postId;
-  const CommentsPage({super.key, required this.postId});
+  const CommentsScreen({super.key, required this.postId});
 
   @override
   Widget build(BuildContext context) {
-    final ref = FirebaseDatabase.instance.ref('post_comments/$postId');
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final repo = context.read<CommunityRepository>();
+    final authVm = context.watch<AuthViewModel>();
+    final currentUserId = authVm.user?.uid;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(title: const Text('Comments')),
       body: Column(
         children: [
-          /// ================= COMMENTS LIST =================
           Expanded(
             child: StreamBuilder(
-              stream: ref.onValue,
+              stream: repo.watchComments(postId),
               builder: (context, snapshot) {
-                if (!snapshot.hasData ||
-                    snapshot.data!.snapshot.value == null) {
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(
                     child: Text(
                       'No comments yet',
@@ -31,25 +31,13 @@ class CommentsPage extends StatelessWidget {
                   );
                 }
 
-                final raw = Map<dynamic, dynamic>.from(
-                  snapshot.data!.snapshot.value as Map,
-                );
-
-                final comments = raw.entries.toList()
-                  ..sort(
-                    (a, b) => (a.value['timePosted'] as int)
-                        .compareTo(b.value['timePosted'] as int),
-                  );
-
+                final comments = snapshot.data!;
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                   itemCount: comments.length,
                   itemBuilder: (context, index) {
-                    final commentId = comments[index].key;
-                    final c = comments[index].value;
-
-                    final bool isOwner = currentUser != null &&
-                        c['uid'] == currentUser.uid;
+                    final comment = comments[index];
+                    final isOwner = comment.uid == currentUserId;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -61,38 +49,32 @@ class CommentsPage extends StatelessWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          /// COMMENT TEXT
                           Expanded(
                             child: RichText(
                               text: TextSpan(
-                                style:
-                                    const TextStyle(color: Colors.black),
+                                style: const TextStyle(color: Colors.black),
                                 children: [
                                   TextSpan(
-                                    text: '${c['username']} ',
+                                    text: '${comment.username} ',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  TextSpan(text: c['text']),
+                                  TextSpan(text: comment.text),
                                 ],
                               ),
                             ),
                           ),
-
-                          /// DELETE OPTION (ONLY FOR OWNER)
                           if (isOwner)
                             InkWell(
-                              onTap: () {
-                                _showDeleteCommentDialog(
-                                  context,
-                                  ref,
-                                  commentId,
-                                );
-                              },
+                              onTap: () => _showDeleteCommentDialog(
+                                context,
+                                repo,
+                                postId,
+                                comment.id,
+                              ),
                               child: Padding(
-                                padding:
-                                    const EdgeInsets.only(left: 6),
+                                padding: const EdgeInsets.only(left: 6),
                                 child: Icon(
                                   Icons.more_vert,
                                   size: 18,
@@ -108,8 +90,6 @@ class CommentsPage extends StatelessWidget {
               },
             ),
           ),
-
-          /// ================= COMMENT INPUT =================
           _CommentInput(postId: postId),
         ],
       ),
@@ -117,7 +97,6 @@ class CommentsPage extends StatelessWidget {
   }
 }
 
-/// ================= COMMENT INPUT =================
 class _CommentInput extends StatefulWidget {
   final String postId;
   const _CommentInput({required this.postId});
@@ -131,7 +110,9 @@ class _CommentInputState extends State<_CommentInput> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final repo = context.read<CommunityRepository>();
+    final authVm = context.read<AuthViewModel>();
+    final user = authVm.user;
 
     return SafeArea(
       top: false,
@@ -159,23 +140,17 @@ class _CommentInputState extends State<_CommentInput> {
             IconButton(
               icon: const Icon(Icons.send),
               onPressed: () async {
-                if (user == null || controller.text.trim().isEmpty) {
-                  return;
-                }
+                if (user == null || controller.text.trim().isEmpty) return;
 
                 final text = controller.text.trim();
-                controller.clear(); // Clear FIRST for instant visual feedback
-                
-                final ref = FirebaseDatabase.instance
-                    .ref('post_comments/${widget.postId}')
-                    .push();
+                controller.clear();
 
-                await ref.set({
-                  'uid': user.uid,
-                  'username': user.email?.split('@')[0] ?? 'User',
-                  'text': text,
-                  'timePosted': ServerValue.timestamp,
-                });
+                await repo.addComment(
+                  postId: widget.postId,
+                  uid: user.uid,
+                  username: user.email.split('@')[0],
+                  text: text,
+                );
               },
             ),
           ],
@@ -183,12 +158,18 @@ class _CommentInputState extends State<_CommentInput> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
 }
 
-/// ================= DELETE CONFIRMATION =================
 void _showDeleteCommentDialog(
   BuildContext context,
-  DatabaseReference commentsRef,
+  CommunityRepository repo,
+  String postId,
   String commentId,
 ) {
   showDialog(
@@ -203,11 +184,13 @@ void _showDeleteCommentDialog(
         ),
         TextButton(
           onPressed: () async {
-            Navigator.pop(context); // Close dialog FIRST
-            await commentsRef.child(commentId).remove();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Comment deleted')),
-            );
+            Navigator.pop(context);
+            await repo.deleteComment(postId, commentId);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Comment deleted')),
+              );
+            }
           },
           child: const Text(
             'Delete',
