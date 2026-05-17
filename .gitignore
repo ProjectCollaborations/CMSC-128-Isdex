@@ -85,6 +85,11 @@ AGENTS.md
 AGENTS-ARCHITECTURE.md
 docs/superpowers/
 
+# ── Test artifacts / screenshots ──────────────────────────────────
+flutter_*.png
+flutter_*.jpg
+devtools_options.yaml
+
 # ── Misc / OS ─────────────────────────────────────────────────────
 .env
 *.DS_Store
