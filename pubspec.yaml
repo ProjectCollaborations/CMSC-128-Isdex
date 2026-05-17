@@ -22,13 +22,15 @@ dependencies:
   geolocator: ^13.0.0
   intl: ^0.19.0
   google_generative_ai: ^0.4.6
-  google_mlkit_image_labeling: ^0.12.0
   flutter_dotenv: ^6.0.1
   http_parser: ^4.0.0
   path_provider: ^2.1.0
   flutter_markdown: ^0.7.7+1
   provider: ^6.1.0
   go_router: ^14.2.0
+
+  tflite_plus: ^1.0.3
+  image: ^4.5.2
 
 dev_dependencies:
   flutter_test:
@@ -53,3 +55,6 @@ flutter:
     - .env
     - assets/images/
     - assets/images/fish/
+    - assets/models/fish_model.tflite
+    - assets/models/1.tflite
+    - assets/models/labels.txt

@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
+import 'package:tflite_plus/tflite_plus.dart';
+import 'package:image/image.dart' as img;
 import '../../models/fish.dart';
 
 class FishImageSearchScreen extends StatefulWidget {
@@ -18,157 +21,238 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   List<Fish> _matchedFish = [];
   List<String> _detectedLabels = [];
   bool _isLoading = false;
+  bool _isModelReady = false;
   String _statusMessage = '';
   final TextEditingController _searchController = TextEditingController();
 
-  late ImageLabeler _imageLabeler;
+  Interpreter? _interpreter;
+  List<String> _imagenetLabels = [];
+  static const int _inputSize = 224;
+  static const int _outputSize = 1001; // ImageNet output classes
+
+  // Map ImageNet class names to your fish species
+  final Map<String, List<String>> _synonymMap = {
+    'tuna': ['Yellowfin Tuna', 'Tuna'],
+    'milkfish': ['Milkfish', 'Bangus'],
+    'tilapia': ['Nile Tilapia', 'Tilapia'],
+    'catfish': ['Asian Catfish', 'Manila Catfish', 'Catfish'],
+    'carp': ['Common Carp', 'Carp'],
+    'grouper': ['Leopard Coral Grouper', 'Grouper'],
+    'snapper': ['Red Snapper', 'Snapper'],
+    'mackerel': ['Long-jawed Mackerel', 'Mackerel'],
+    'sardine': ['Goldstripe Sardinella', 'Sardine'],
+    'puffer': ['Pufferfish', 'Puffer'],
+    'parrotfish': ['Parrotfish'],
+    'surgeonfish': ['Surgeonfish'],
+    'butterflyfish': ['Butterflyfish'],
+    'eel': ['Eel'],
+    'barracuda': ['Barracuda'],
+    'jack': ['Jack', 'Trevally'],
+    'seabass': ['Asian Seabass', 'Barramundi'],
+    'bream': ['Threadfin Bream'],
+    'emperor': ['Emperor'],
+    'goatfish': ['Goatfish'],
+    'rabbitfish': ['Rabbit Fish'],
+    'moonfish': ['Moonfish'],
+    'ribbonfish': ['Ribbonfish'],
+    'pomfret': ['Pomfret'],
+    'seahorse': ['Seahorse'],
+    'mudfish': ['Mudfish', 'Striped Snakehead'],
+    'goby': ['White Goby'],
+    'perch': ['Silver Perch', 'Climbing Perch'],
+    'gourami': ['Giant Gourami'],
+    'tarpon': ['Indo-Pacific Tarpon'],
+    'dolphinfish': ['Dolphinfish'],
+    'salmon': ['Threadfin Salmon'],
+    'bigeye': ['Red Bigeye'],
+    'scat': ['Spotted Scat'],
+    'halfbeak': ['Halfbeak'],
+    'needlefish': ['Needlefish'],
+    'flyingfish': ['Flying Fish'],
+    'seadragon': ['Sea Dragon'],
+    'porcupinefish': ['Porcupinefish'],
+    'boxfish': ['Boxfish'],
+  };
 
   @override
   void initState() {
     super.initState();
-    _initializeImageLabeler();
+    _loadModel();
   }
 
-  void _initializeImageLabeler() {
-    final options = ImageLabelerOptions(
-      confidenceThreshold: 0.5,
-    );
-    _imageLabeler = ImageLabeler(options: options);
+  Future<void> _loadModel() async {
+    setState(() => _isLoading = true);
+    try {
+      _interpreter = await Interpreter.fromAsset('assets/models/1.tflite');
+      final labelString = await rootBundle.loadString('assets/models/labels.txt');
+      _imagenetLabels = labelString.split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      debugPrint('✅ Loaded ${_imagenetLabels.length} ImageNet labels');
+      setState(() {
+        _isModelReady = true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Failed to load model: $e');
+      setState(() {
+        _statusMessage = 'AI model failed to load. Please restart the app.';
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    if (!_isModelReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI model is still loading, please wait...')),
+      );
+      return;
+    }
+
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 100,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
     if (picked == null) return;
 
     final imageFile = File(picked.path);
-
     setState(() {
       _imageFile = imageFile;
       _isLoading = true;
       _matchedFish = [];
       _detectedLabels = [];
-      _statusMessage = 'Analyzing image with ML Kit...';
+      _statusMessage = 'Identifying fish...';
     });
 
-    try {
-      await _recognizeFishWithMLKit(imageFile);
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _statusMessage =
-              'Recognition failed. Please try manual search below:';
-          _isLoading = false;
-        });
-      }
-    }
+    await _classifyImage(imageFile);
   }
 
-  Future<void> _recognizeFishWithMLKit(File imageFile) async {
+  Future<Float32List> _preprocessImage(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    img.Image? image = img.decodeImage(bytes);
+    if (image == null) throw Exception('Failed to decode image');
+
+    final scale = _inputSize / (image.width < image.height ? image.width : image.height);
+    int newWidth = (image.width * scale).round();
+    int newHeight = (image.height * scale).round();
+    image = img.copyResize(image, width: newWidth, height: newHeight);
+
+    final cropX = (image.width - _inputSize) ~/ 2;
+    final cropY = (image.height - _inputSize) ~/ 2;
+    image = img.copyCrop(image, x: cropX, y: cropY, width: _inputSize, height: _inputSize);
+
+    final input = Float32List(1 * _inputSize * _inputSize * 3);
+    int idx = 0;
+    for (int y = 0; y < _inputSize; y++) {
+      for (int x = 0; x < _inputSize; x++) {
+        final pixel = image.getPixel(x, y);
+        input[idx++] = (pixel.r / 127.5) - 1.0;
+        input[idx++] = (pixel.g / 127.5) - 1.0;
+        input[idx++] = (pixel.b / 127.5) - 1.0;
+      }
+    }
+    return input;
+  }
+
+  Future<void> _classifyImage(File imageFile) async {
+    if (_interpreter == null) return;
+
     try {
-      final inputImage = InputImage.fromFile(imageFile);
-
-      final List<ImageLabel> labels =
-          await _imageLabeler.processImage(inputImage);
-
-      if (labels.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _statusMessage =
-                'No objects detected. Try a clearer photo or search manually:';
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      List<String> detectedLabels = [];
-      for (ImageLabel label in labels) {
-        if (label.confidence > 0.5) {
-          detectedLabels.add(label.label.toLowerCase());
+      final flatInput = await _preprocessImage(imageFile);
+      final input4D = List.generate(1, (_) => List.generate(_inputSize, (_) => List.generate(_inputSize, (_) => List.filled(3, 0.0))));
+      int idx = 0;
+      for (int h = 0; h < _inputSize; h++) {
+        for (int w = 0; w < _inputSize; w++) {
+          for (int c = 0; c < 3; c++) {
+            input4D[0][h][w][c] = flatInput[idx++];
+          }
         }
       }
 
-      detectedLabels = detectedLabels.toSet().toList();
+      final output = List.generate(1, (_) => List.filled(_outputSize, 0.0));
+      _interpreter!.run(input4D, output);
 
-      final fishKeywords = ['fish', 'marine', 'sea', 'aquatic', 'swimming'];
-      for (var keyword in fishKeywords) {
-        if (!detectedLabels.contains(keyword)) {
-          detectedLabels.add(keyword);
-        }
-      }
+      final rawPredictions = _getTopPredictions(output[0], 10);
+      final mappedFish = _mapToLocalFish(rawPredictions);
+      final matchedFish = mappedFish.map((e) => e.$1).toList();
+      final displayLabels = mappedFish.map((e) => '${e.$1.commonName} (${(e.$2 * 100).toStringAsFixed(0)}%)').toList();
 
       setState(() {
-        _detectedLabels = detectedLabels;
-        _matchedFish = _matchAgainstDatabase(detectedLabels);
-        _statusMessage = _matchedFish.isEmpty
-            ? 'No matching fish found. Try manual search:'
-            : '';
+        _detectedLabels = displayLabels;
+        _matchedFish = matchedFish;
+        _statusMessage = matchedFish.isEmpty ? 'No matching fish found. Try manual search.' : '';
         _isLoading = false;
       });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _statusMessage =
-              'Recognition error. Please try manual search:';
-          _isLoading = false;
-        });
-      }
+      debugPrint('Classification error: $e');
+      setState(() {
+        _statusMessage = 'Classification failed. Please try manual search.';
+        _isLoading = false;
+      });
     }
   }
 
-  List<Fish> _matchAgainstDatabase(List<String> detectedLabels) {
-    Set<Fish> uniqueMatches = {};
+  List<(String, double)> _getTopPredictions(List<double> probabilities, int topK) {
+    final indices = List.generate(probabilities.length, (i) => i);
+    indices.sort((a, b) => probabilities[b].compareTo(probabilities[a]));
+    final result = <(String, double)>[];
+    for (int i = 0; i < topK && i < indices.length; i++) {
+      final idx = indices[i];
+      if (idx < _imagenetLabels.length) {
+        result.add((_imagenetLabels[idx], probabilities[idx]));
+      }
+    }
+    return result;
+  }
 
-    for (var fish in widget.allSpecies) {
-      final common = fish.commonName.toLowerCase();
-      final scientific = fish.scientificName.toLowerCase();
-      final local = fish.localName.toLowerCase();
-      final habitat = fish.habitat.toLowerCase();
+  List<(Fish, double)> _mapToLocalFish(List<(String, double)> imagenetPredictions) {
+    final Map<Fish, double> scoreMap = {};
 
-      for (var label in detectedLabels) {
-        if (common.contains(label) ||
-            label.contains(common) ||
-            scientific.contains(label) ||
-            label.contains(scientific) ||
-            local.contains(label) ||
-            label.contains(local) ||
-            habitat.contains(label)) {
-          uniqueMatches.add(fish);
-          break;
+    for (var pred in imagenetPredictions) {
+      final label = pred.$1.toLowerCase();
+      final confidence = pred.$2;
+
+      List<String> possibleFishNames = [];
+      for (var entry in _synonymMap.entries) {
+        if (label.contains(entry.key) || entry.key.contains(label)) {
+          possibleFishNames.addAll(entry.value);
+        }
+      }
+      possibleFishNames.add(label);
+
+      for (var fish in widget.allSpecies) {
+        final common = fish.commonName.toLowerCase();
+        final scientific = fish.scientificName.toLowerCase();
+        final local = fish.localName.toLowerCase();
+
+        for (var name in possibleFishNames) {
+          final lowerName = name.toLowerCase();
+          if (common == lowerName ||
+              scientific == lowerName ||
+              local == lowerName ||
+              common.contains(lowerName) ||
+              scientific.contains(lowerName) ||
+              local.contains(lowerName)) {
+            final existingScore = scoreMap[fish] ?? 0.0;
+            scoreMap[fish] = existingScore + confidence;
+            break;
+          }
         }
       }
     }
 
-    var matches = uniqueMatches.toList();
-    matches.sort((a, b) {
-      int scoreA = 0;
-      int scoreB = 0;
-
-      for (var label in detectedLabels) {
-        final commonA = a.commonName.toLowerCase();
-        final commonB = b.commonName.toLowerCase();
-
-        if (label == commonA) scoreA += 10;
-        if (label == commonB) scoreB += 10;
-        if (commonA.contains(label)) scoreA += 3;
-        if (commonB.contains(label)) scoreB += 3;
-
-        final scientificA = a.scientificName.toLowerCase();
-        final scientificB = b.scientificName.toLowerCase();
-        if (scientificA.contains(label)) scoreA += 5;
-        if (scientificB.contains(label)) scoreB += 5;
-      }
-
-      return scoreB.compareTo(scoreA);
-    });
-
-    return matches.take(10).toList();
+    final matches = scoreMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return matches.map((e) => (e.key, e.value)).toList();
   }
 
   void _performManualSearch() {
     final query = _searchController.text.trim().toLowerCase();
-
     if (query.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a fish name to search')),
@@ -176,24 +260,18 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       final matches = widget.allSpecies.where((fish) {
         return fish.commonName.toLowerCase().contains(query) ||
-            fish.scientificName.toLowerCase().contains(query) ||
-            fish.localName.toLowerCase().contains(query);
+               fish.scientificName.toLowerCase().contains(query) ||
+               fish.localName.toLowerCase().contains(query);
       }).toList();
-
       if (mounted) {
         setState(() {
           _matchedFish = matches;
           _detectedLabels = [query];
-          _statusMessage = matches.isEmpty
-              ? 'No fish found matching "$query"'
-              : '';
+          _statusMessage = matches.isEmpty ? 'No fish found matching "$query"' : '';
           _isLoading = false;
         });
       }
@@ -206,11 +284,12 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
 
   @override
   void dispose() {
-    _imageLabeler.close();
+    _interpreter?.close();
     _searchController.dispose();
     super.dispose();
   }
 
+  // ---------- UI Methods (fully implemented) ----------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -230,9 +309,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                   _buildImagePreview(),
                   const SizedBox(height: 16),
                   _buildActionButtons(),
-                  if (_detectedLabels.isNotEmpty &&
-                      !_isLoading &&
-                      _imageFile != null)
+                  if (_detectedLabels.isNotEmpty && !_isLoading && _imageFile != null)
                     _buildLabelsSection(),
                   const SizedBox(height: 24),
                   _buildDivider(),
@@ -244,9 +321,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                     _buildResultsCount(),
                   if (_matchedFish.isNotEmpty && !_isLoading)
                     _buildResultsList(),
-                  if (_statusMessage.isNotEmpty &&
-                      !_isLoading &&
-                      _matchedFish.isEmpty)
+                  if (_statusMessage.isNotEmpty && !_isLoading && _matchedFish.isEmpty)
                     _buildNoResults(),
                 ],
               ),
@@ -269,11 +344,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       child: _imageFile != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.file(
-                _imageFile!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-              ),
+              child: Image.file(_imageFile!, fit: BoxFit.cover),
             )
           : Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -286,7 +357,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'ML Kit will analyze the image offline',
+                  'AI will identify the fish offline',
                   style: TextStyle(color: Colors.grey[400], fontSize: 12),
                 ),
               ],
@@ -300,30 +371,24 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed:
-                _isLoading ? null : () => _pickImage(ImageSource.camera),
+            onPressed: _isLoading ? null : () => _pickImage(ImageSource.camera),
             icon: const Icon(Icons.camera_alt),
             label: const Text('Camera'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed:
-                _isLoading ? null : () => _pickImage(ImageSource.gallery),
+            onPressed: _isLoading ? null : () => _pickImage(ImageSource.gallery),
             icon: const Icon(Icons.photo_library),
             label: const Text('Gallery'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ),
@@ -348,12 +413,8 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
               Icon(Icons.auto_awesome, size: 16, color: Colors.blue[700]),
               const SizedBox(width: 8),
               Text(
-                'ML Kit Detected:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                  fontSize: 12,
-                ),
+                'AI Predictions:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[700], fontSize: 12),
               ),
             ],
           ),
@@ -363,17 +424,13 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
             runSpacing: 4,
             children: _detectedLabels.take(6).map((label) {
               return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.blue[200]!),
                 ),
-                child: Text(
-                  label,
-                  style: TextStyle(fontSize: 12, color: Colors.blue[800]),
-                ),
+                child: Text(label, style: TextStyle(fontSize: 12, color: Colors.blue[800])),
               );
             }).toList(),
           ),
@@ -388,13 +445,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
         Expanded(child: Divider(color: Colors.grey[300])),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'OR',
-            style: TextStyle(
-              color: Colors.grey[500],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          child: Text('OR', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
         ),
         Expanded(child: Divider(color: Colors.grey[300])),
       ],
@@ -416,10 +467,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
             children: [
               Icon(Icons.search, size: 20, color: Colors.green[700]),
               const SizedBox(width: 8),
-              const Text(
-                'Manual Search',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+              const Text('Manual Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
@@ -436,13 +484,8 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                   enabled: !_isLoading,
                   decoration: InputDecoration(
                     hintText: 'Enter fish name...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                   onSubmitted: (_) => _performManualSearch(),
                 ),
@@ -452,11 +495,8 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 onPressed: _isLoading ? null : _performManualSearch,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Search'),
               ),
@@ -474,7 +514,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
         children: [
           CircularProgressIndicator(),
           SizedBox(height: 16),
-          Text('Analyzing image with ML Kit...'),
+          Text('Analyzing image with AI...'),
         ],
       ),
     );
@@ -500,9 +540,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
             onTap: () => _navigateToFishDetail(fish),
             borderRadius: BorderRadius.circular(12),
@@ -525,58 +563,24 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                               width: 60,
                               height: 60,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.set_meal,
-                                color: Colors.blue[300],
-                                size: 30,
-                              ),
+                              errorBuilder: (_, __, ___) => Icon(Icons.set_meal, color: Colors.blue[300], size: 30),
                             ),
                           )
-                        : Icon(
-                            Icons.set_meal,
-                            color: Colors.blue[300],
-                            size: 30,
-                          ),
+                        : Icon(Icons.set_meal, color: Colors.blue[300], size: 30),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          fish.commonName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text(fish.commonName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(
-                          fish.scientificName,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey,
-                          ),
-                        ),
+                        Text(fish.scientificName, style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey)),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[100],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            fish.habitat,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.blue[800],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: Colors.blue[100], borderRadius: BorderRadius.circular(10)),
+                          child: Text(fish.habitat, style: TextStyle(fontSize: 10, color: Colors.blue[800], fontWeight: FontWeight.w500)),
                         ),
                       ],
                     ),
@@ -598,11 +602,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
         children: [
           Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
-          Text(
-            _statusMessage,
-            style: TextStyle(color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
+          Text(_statusMessage, style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
         ],
       ),
     );
