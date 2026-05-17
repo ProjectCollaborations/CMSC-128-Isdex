@@ -77,6 +77,7 @@ class _IsDexAppState extends State<IsDexApp> {
         ),
         ChangeNotifierProvider(
           create: (ctx) => CommunityViewModel(
+            authViewModel: ctx.read<AuthViewModel>(),
             watchPosts: () => ctx.read<CommunityRepository>().watchPosts(),
             watchComments: (postId) => ctx.read<CommunityRepository>().watchComments(postId),
             addPost: ({required uid, required username, required caption, required imageBase64}) =>
