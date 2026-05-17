@@ -12,7 +12,6 @@ import '../services/auth_service.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/fish_catalog_viewmodel.dart';
 import '../viewmodels/fish_detail_viewmodel.dart';
-import '../viewmodels/map_viewmodel.dart';
 import '../viewmodels/sighting_viewmodel.dart';
 import 'router.dart';
 
@@ -74,7 +73,7 @@ class _IsDexAppState extends State<IsDexApp> {
               reportSighting: (id) => ctx.read<SightingRepository>().reportSighting(id),
               watchAllFish: () => ctx.read<FishRepository>().watchAll(),
               currentUserId: () => authVm.user?.uid,
-              currentUserDisplay: () => authVm.user?.email?.split('@')[0] ?? 'Anonymous',
+              currentUserDisplay: () => authVm.user?.email.split('@')[0] ?? 'Anonymous',
             );
           },
         ),

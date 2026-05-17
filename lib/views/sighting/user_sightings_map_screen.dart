@@ -8,6 +8,7 @@ import '../../viewmodels/sighting_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/sighting.dart';
 import '../../services/geo_validation_service.dart';
+import '../../repositories/sighting_repository.dart';
 
 class UserSightingsMapScreen extends StatefulWidget {
   const UserSightingsMapScreen({super.key});
@@ -106,7 +107,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       if (mounted) {
         setState(() => _userLocation = latLng);
         _mapController.move(latLng, 14.0);
-        await _showAddSightingDialog(latLng, user.email ?? '');
+        await _showAddSightingDialog(latLng, user.email);
       }
     } catch (e) {
       if (mounted) {

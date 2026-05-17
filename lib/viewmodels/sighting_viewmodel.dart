@@ -127,9 +127,4 @@ class SightingViewModel extends ChangeNotifier {
   Future<void> reportSighting(String id) async {
     await _reportSighting(id);
   }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
 }
