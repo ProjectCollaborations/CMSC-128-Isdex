@@ -12,7 +12,6 @@ import '../services/auth_service.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/fish_catalog_viewmodel.dart';
 import '../viewmodels/fish_detail_viewmodel.dart';
-import '../viewmodels/sighting_viewmodel.dart';
 import 'router.dart';
 
 class IsDexApp extends StatefulWidget {
@@ -62,20 +61,6 @@ class _IsDexAppState extends State<IsDexApp> {
           create: (ctx) => FishDetailViewModel(
             (id) => ctx.read<FishRepository>().getById(id),
           ),
-        ),
-        ChangeNotifierProvider(
-          create: (ctx) {
-            final authVm = ctx.read<AuthViewModel>();
-            return SightingViewModel(
-              watchAllSightings: () => ctx.read<SightingRepository>().watchAll(),
-              pushSighting: (s) => ctx.read<SightingRepository>().push(s),
-              deleteSighting: (id) => ctx.read<SightingRepository>().delete(id),
-              reportSighting: (id) => ctx.read<SightingRepository>().reportSighting(id),
-              watchAllFish: () => ctx.read<FishRepository>().watchAll(),
-              currentUserId: () => authVm.user?.uid,
-              currentUserDisplay: () => authVm.user?.email.split('@')[0] ?? 'Anonymous',
-            );
-          },
         ),
       ],
       child: MaterialApp.router(

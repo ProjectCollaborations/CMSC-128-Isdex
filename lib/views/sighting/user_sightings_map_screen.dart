@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../viewmodels/sighting_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/sighting.dart';
-import '../../services/geo_validation_service.dart';
 import '../../repositories/sighting_repository.dart';
+import '../../repositories/fish_repository.dart';
+import '../../services/geo_validation_service.dart';
 
 class UserSightingsMapScreen extends StatefulWidget {
   const UserSightingsMapScreen({super.key});
@@ -22,11 +23,41 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   final MapController _mapController = MapController();
   LatLng? _userLocation;
   bool _isLocating = false;
+  SightingViewModel? _sightingVm;
 
   @override
   void initState() {
     super.initState();
     _getUserLocationOnStartup();
+  }
+
+  @override
+  void dispose() {
+    _sightingVm?.removeListener(_onVmChanged);
+    _sightingVm?.dispose();
+    super.dispose();
+  }
+
+  SightingViewModel _getSightingVm(BuildContext context) {
+    if (_sightingVm != null) return _sightingVm!;
+    final sightingRepo = context.read<SightingRepository>();
+    final fishRepo = context.read<FishRepository>();
+    final authVm = context.read<AuthViewModel>();
+    _sightingVm = SightingViewModel(
+      watchAllSightings: () => sightingRepo.watchAll(),
+      pushSighting: (s) => sightingRepo.push(s),
+      deleteSighting: (id) => sightingRepo.delete(id),
+      reportSighting: (id) => sightingRepo.reportSighting(id),
+      watchAllFish: () => fishRepo.watchAll(),
+      currentUserId: () => authVm.user?.uid,
+      currentUserDisplay: () => authVm.user?.email.split('@')[0] ?? 'Anonymous',
+    );
+    _sightingVm!.addListener(_onVmChanged);
+    return _sightingVm!;
+  }
+
+  void _onVmChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _getUserLocationOnStartup() async {
@@ -64,7 +95,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       return;
     }
 
-    final sightingVm = context.read<SightingViewModel>();
+    final sightingVm = _getSightingVm(context);
     if (sightingVm.fishList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Loading fish list, please wait...')),
@@ -121,7 +152,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   }
 
   Future<void> _showAddSightingDialog(LatLng latLng, String userEmail) async {
-    final sightingVm = context.read<SightingViewModel>();
+    final sightingVm = _getSightingVm(context);
     String? selectedFishId;
     String? selectedFishName;
     final notesController = TextEditingController();
@@ -452,8 +483,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   child: TextButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await context
-                          .read<SightingViewModel>()
+                      await _getSightingVm(context)
                           .deleteSighting(sighting.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -474,8 +504,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   child: TextButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await context
-                          .read<SightingViewModel>()
+                      await _getSightingVm(context)
                           .reportSighting(sighting.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -504,7 +533,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   @override
   Widget build(BuildContext context) {
     final authVm = context.watch<AuthViewModel>();
-    final sightingVm = context.watch<SightingViewModel>();
+    final sightingVm = _getSightingVm(context);
     final currentUid = authVm.user?.uid;
     final visible = sightingVm.getVisibleSightings(currentUid);
     final markers = _buildMarkers(visible, currentUid);
