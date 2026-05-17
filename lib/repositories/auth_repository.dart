@@ -18,15 +18,13 @@ class AuthRepository {
   Future<AppUser> signIn(String email, String password) async {
     final user = await _authService.signInWithEmail(email, password);
     if (user == null) throw Exception('Sign-in failed');
-    final appUser = await _getAppUser(user.uid);
-    return appUser;
+    return fetchAppUser(user.uid);
   }
 
   Future<AppUser> signUp(String email, String password, String username) async {
     final user = await _authService.signUpWithEmail(email, password, username);
     if (user == null) throw Exception('Sign-up failed');
-    final appUser = await _getAppUser(user.uid);
-    return appUser;
+    return fetchAppUser(user.uid);
   }
 
   Future<void> signOut() async {
@@ -45,7 +43,7 @@ class AuthRepository {
     return await _authService.isEmailRegisteredInAppDb(email);
   }
 
-  Future<AppUser> _getAppUser(String uid) async {
+  Future<AppUser> fetchAppUser(String uid) async {
     final snap = await _db.child(FirebaseNodes.userById(uid)).get();
     if (snap.exists && snap.value != null) {
       return AppUser.fromMap(uid, Map<dynamic, dynamic>.from(snap.value as Map));

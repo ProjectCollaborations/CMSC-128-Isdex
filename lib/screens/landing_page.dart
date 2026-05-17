@@ -3,8 +3,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'map_screen.dart';
 import 'community_page.dart';  // Add this import
 import 'fish_detail_page.dart';
-import 'login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'user_sightings_map_screen.dart';
 import 'ai_chat_screen.dart';
 import 'fish_image_search.dart';
@@ -195,10 +195,7 @@ void _showFishDetails(Map<dynamic, dynamic> fish) {
                           return ElevatedButton(
                             onPressed: () {
                               if (user == null) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                                );
+                                context.go('/login');
                               } else {
                                 _showUserMenu();
                               }

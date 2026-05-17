@@ -8,7 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'login_page.dart';
+import 'package:go_router/go_router.dart';
 import 'comments_page.dart';
 
 class CommunityPage extends StatelessWidget {
@@ -422,10 +422,7 @@ void _showLoginPrompt(BuildContext context) {
         TextButton(
           onPressed: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginPage()),
-            );
+            context.go('/login');
           },
           child: const Text('Log In'),
         ),
