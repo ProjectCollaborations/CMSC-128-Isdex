@@ -14,8 +14,8 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  final AuthService _authService = AuthService();
+  late final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  late final AuthService _authService = AuthService(_db);
   
   // State variables
   String _currentUserRole = 'mod'; // Default fallback

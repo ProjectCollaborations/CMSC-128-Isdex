@@ -27,6 +27,8 @@ class FakeFishByIdRepo {
   Future<Fish?> getById(String id) async => _fish[id];
 }
 
+Stream<List<Fish>> emptyFishStream() => Stream.value([]);
+
 void main() {
   group('MapViewModel', () {
     late MapViewModel vm;
@@ -60,6 +62,7 @@ void main() {
       vm = MapViewModel(
         watchAll: fakeMapRepo.watchAll,
         fishById: (_) async => null,
+        watchAllFish: emptyFishStream,
       );
       fakeMapRepo.emitLocations(testLocations);
       await Future.delayed(const Duration(milliseconds: 50));
@@ -85,6 +88,7 @@ void main() {
       vm = MapViewModel(
         watchAll: fakeMapRepo.watchAll,
         fishById: fakeFishRepo.getById,
+        watchAllFish: emptyFishStream,
         fishId: 'fish1',
       );
       fakeMapRepo.emitLocations(testLocations);
@@ -97,6 +101,7 @@ void main() {
       vm = MapViewModel(
         watchAll: fakeMapRepo.watchAll,
         fishById: (_) async => null,
+        watchAllFish: emptyFishStream,
       );
       expect(vm.isLoading, isTrue);
     });
@@ -121,6 +126,7 @@ void main() {
       vm = MapViewModel(
         watchAll: fakeMapRepo.watchAll,
         fishById: fakeFishRepo.getById,
+        watchAllFish: emptyFishStream,
         fishId: 'fish1',
       );
 
@@ -133,6 +139,7 @@ void main() {
       vm = MapViewModel(
         watchAll: fakeMapRepo.watchAll,
         fishById: (_) async => null,
+        watchAllFish: emptyFishStream,
         fishId: 'nonexistent',
       );
       fakeMapRepo.emitLocations(testLocations);

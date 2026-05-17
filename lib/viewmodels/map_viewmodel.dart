@@ -5,6 +5,7 @@ import '../models/fish.dart';
 
 typedef MapStreamFactory = Stream<List<MapLocation>> Function();
 typedef FishByIdFactory = Future<Fish?> Function(String id);
+typedef FishStreamFactory = Stream<List<Fish>> Function();
 
 class MapViewModel extends ChangeNotifier {
   final MapStreamFactory _watchAll;
@@ -16,15 +17,20 @@ class MapViewModel extends ChangeNotifier {
   List<MapLocation> _locations = [];
   bool _isLoading = true;
   bool _specificFishActive = true;
+  Map<String, String> _fishNames = {};
   StreamSubscription? _sub;
+  StreamSubscription<List<Fish>>? _fishSub;
 
   List<MapLocation> get locations => _locations;
   bool get isLoading => _isLoading;
   bool get specificFishActive => _specificFishActive;
 
+  String fishNameFor(String fishId) => _fishNames[fishId] ?? fishId;
+
   MapViewModel({
     required MapStreamFactory watchAll,
     required FishByIdFactory fishById,
+    required FishStreamFactory watchAllFish,
     String? fishId,
     double? latitude,
     double? longitude,
@@ -33,6 +39,10 @@ class MapViewModel extends ChangeNotifier {
         _fishId = fishId,
         _latitude = latitude,
         _longitude = longitude {
+    _fishSub = watchAllFish().listen((fish) {
+      _fishNames = {for (var f in fish) f.id: f.commonName};
+      notifyListeners();
+    });
     _init();
   }
 
@@ -84,6 +94,7 @@ class MapViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    _fishSub?.cancel();
     super.dispose();
   }
 }

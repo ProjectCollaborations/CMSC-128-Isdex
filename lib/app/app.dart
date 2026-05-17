@@ -1,5 +1,4 @@
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../repositories/auth_repository.dart';
@@ -30,10 +29,6 @@ class _IsDexAppState extends State<IsDexApp> {
   @override
   void initState() {
     super.initState();
-    if (!kIsWeb) {
-      FirebaseDatabase.instance.setPersistenceEnabled(true);
-      FirebaseDatabase.instance.setPersistenceCacheSizeBytes(10 * 1024 * 1024);
-    }
     _db = FirebaseDatabase.instance.ref();
     _authRepo = AuthRepository(AuthService(_db), _db);
     _authVm = AuthViewModel(_authRepo);

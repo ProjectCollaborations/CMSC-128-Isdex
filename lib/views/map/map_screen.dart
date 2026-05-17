@@ -42,6 +42,7 @@ class _MapScreenState extends State<MapScreen> {
     _vm = MapViewModel(
       watchAll: () => context.read<MapRepository>().watchAll(),
       fishById: (id) => context.read<FishRepository>().getById(id),
+      watchAllFish: () => context.read<FishRepository>().watchAll(),
       fishId: widget.fishId,
       latitude: widget.latitude,
       longitude: widget.longitude,
@@ -136,6 +137,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Marker _buildFishMarker(MapLocation loc) {
+    final label = _vm.fishNameFor(loc.fishId);
     return Marker(
       point: LatLng(loc.latitude, loc.longitude),
       width: 80,
@@ -149,6 +151,22 @@ class _MapScreenState extends State<MapScreen> {
         child: Column(
           children: [
             const Icon(Icons.location_on, color: Colors.blue, size: 40),
+            if (label.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white70,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
           ],
         ),
       ),

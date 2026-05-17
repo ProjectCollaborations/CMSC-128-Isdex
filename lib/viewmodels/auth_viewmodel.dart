@@ -22,6 +22,21 @@ class AuthViewModel extends ChangeNotifier {
 
   AuthViewModel(this._authRepo) {
     _authSub = _authRepo.authStateChanges.listen(_onAuthStateChanged);
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final firebaseUser = _authRepo.currentUser;
+      if (firebaseUser != null && _user == null) {
+        _user = await _authRepo.fetchAppUser(firebaseUser.uid);
+      }
+    } catch (e) {
+      _user = null;
+    } finally {
+      _initialized = true;
+      notifyListeners();
+    }
   }
 
   Future<void> signIn(String email, String password) async {
@@ -80,13 +95,19 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   void _onAuthStateChanged(User? firebaseUser) async {
-    if (firebaseUser != null && _user == null) {
-      _user = await _authRepo.fetchAppUser(firebaseUser.uid);
-    } else if (firebaseUser == null) {
+    try {
+      if (firebaseUser != null && _user == null) {
+        _user = await _authRepo.fetchAppUser(firebaseUser.uid);
+      } else if (firebaseUser == null) {
+        _user = null;
+      }
+    } catch (e) {
+      print('AuthViewModel: error during init — $e');
       _user = null;
+    } finally {
+      _initialized = true;
+      notifyListeners();
     }
-    _initialized = true;
-    notifyListeners();
   }
 
   String _friendlyMessage(String error) {
