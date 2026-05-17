@@ -1,60 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
-
-/// Represents the IUCN conservation data for a single species.
-class IucnResult {
-  /// Full display label matching existing UI, e.g. "Near Threatened (NT)"
-  final String conservationStatus;
-
-  /// 2-letter IUCN category code, e.g. "NT"
-  final String category;
-
-  /// Population trend from IUCN: "Decreasing", "Stable", "Increasing", or null
-  final String? populationTrend;
-
-  /// Direct link to the species page on iucnredlist.org, or null
-  final String? iucnUrl;
-
-  const IucnResult({
-    required this.conservationStatus,
-    required this.category,
-    this.populationTrend,
-    this.iucnUrl,
-  });
-
-  // Maps IUCN 2-letter category codes → full display labels used in your UI
-  static const Map<String, String> _categoryMap = {
-    'EX': 'Extinct (EX)',
-    'EW': 'Extinct in the Wild (EW)',
-    'CR': 'Critically Endangered (CR)',
-    'EN': 'Endangered (EN)',
-    'VU': 'Vulnerable (VU)',
-    'NT': 'Near Threatened (NT)',
-    'LC': 'Least Concern (LC)',
-    'DD': 'Data Deficient (DD)',
-    'NE': 'Not Evaluated (NE)',
-  };
-
-  factory IucnResult.fromApiMap(Map<String, dynamic> map) {
-    final category = (map['category'] as String?) ?? 'NE';
-    final taxonId = map['taxonid'];
-    return IucnResult(
-      category: category,
-      conservationStatus: _categoryMap[category] ?? 'Not Evaluated (NE)',
-      populationTrend: map['population_trend'] as String?,
-      iucnUrl: taxonId != null
-          ? 'https://www.iucnredlist.org/species/$taxonId'
-          : null,
-    );
-  }
-
-  /// Safe fallback used when the API is unreachable or the token is missing.
-  static const IucnResult unknown = IucnResult(
-    conservationStatus: 'Not Evaluated (NE)',
-    category: 'NE',
-  );
-}
+import '../models/iucn_result.dart';
+export '../models/iucn_result.dart';
 
 /// Fetches IUCN Red List conservation status for a given scientific name
 /// by calling the IUCN API directly from the Flutter client.
