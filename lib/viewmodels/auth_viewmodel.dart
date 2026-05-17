@@ -21,6 +21,7 @@ class AuthViewModel extends ChangeNotifier {
   String get userRole => _user?.role ?? 'user';
 
   AuthViewModel(this._authRepo) {
+    _initialized = true;
     _authSub = _authRepo.authStateChanges.listen(_onAuthStateChanged);
     _init();
   }
@@ -30,12 +31,10 @@ class AuthViewModel extends ChangeNotifier {
       final firebaseUser = _authRepo.currentUser;
       if (firebaseUser != null && _user == null) {
         _user = await _authRepo.fetchAppUser(firebaseUser.uid);
+        notifyListeners();
       }
     } catch (e) {
       _user = null;
-    } finally {
-      _initialized = true;
-      notifyListeners();
     }
   }
 
@@ -98,15 +97,13 @@ class AuthViewModel extends ChangeNotifier {
     try {
       if (firebaseUser != null && _user == null) {
         _user = await _authRepo.fetchAppUser(firebaseUser.uid);
-      } else if (firebaseUser == null) {
+        notifyListeners();
+      } else if (firebaseUser == null && _user != null) {
         _user = null;
+        notifyListeners();
       }
     } catch (e) {
-      print('AuthViewModel: error during init — $e');
-      _user = null;
-    } finally {
-      _initialized = true;
-      notifyListeners();
+      print('AuthViewModel: error during auth change — $e');
     }
   }
 
