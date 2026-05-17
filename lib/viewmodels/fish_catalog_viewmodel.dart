@@ -20,12 +20,12 @@ class FishCatalogViewModel extends ChangeNotifier {
 
   // Getters
   List<Fish> get filteredFish => _filteredFish;
+  List<Fish> get allFish => _allFish;          // ✅ added getter
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get searchQuery => _searchQuery;
   String get selectedHabitat => _selectedHabitat;
 
-  // Available habitats
   List<String> get habitats => ['All', 'Saltwater', 'Freshwater', 'Brackish Water'];
 
   void _initialize() {
@@ -53,12 +53,8 @@ class FishCatalogViewModel extends ChangeNotifier {
   }
 
   void _applyFilters() {
-    // Apply search filter
     List<Fish> result = _fishRepository.searchFish(_allFish, _searchQuery);
-
-    // Apply habitat filter
     result = _fishRepository.filterByHabitat(result, _selectedHabitat);
-
     _filteredFish = result;
     notifyListeners();
   }

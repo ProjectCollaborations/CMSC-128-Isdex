@@ -11,7 +11,7 @@ import 'login_page.dart';
 import 'map_screen.dart';
 import 'user_sightings_map_screen.dart';
 import 'ai_chat_screen.dart';
-import 'fish_image_search.dart';  // ← ADD THIS IMPORT
+import 'fish_image_search.dart';
 import '../services/database_init_service.dart';
 import '../data/models/fish.dart';
 
@@ -172,7 +172,8 @@ class _LandingPageState extends State<LandingPage> {
                           icon: const Icon(Icons.camera_alt, color: Colors.blue),
                           tooltip: 'Search by photo',
                           onPressed: () {
-                            final allFish = fishVm.filteredFish;
+                            // ✅ Use the full fish catalog, not the filtered list
+                            final allFish = fishVm.allFish;
                             
                             if (allFish.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -184,29 +185,11 @@ class _LandingPageState extends State<LandingPage> {
                               return;
                             }
                             
-                            // Convert List<Fish> to List<Map<dynamic, dynamic>>
-                            final allSpecies = allFish.map((fish) {
-                              return {
-                                'fishId': fish.fishId,
-                                'commonName': fish.commonName,
-                                'scientificName': fish.scientificName,
-                                'localName': fish.localName,
-                                'habitat': fish.habitat,
-                                'sizeRange': fish.sizeRange,
-                                'imageUrl': fish.imageUrl,
-                                'identifyingFeatures': fish.identifyingFeatures,
-                                'conservationStatus': fish.conservationStatus,
-                                'conservationDetails': fish.conservationDetails,
-                                'distribution': fish.distribution,
-                              };
-                            }).toList();
-                            
+                            // ✅ Pass List<Fish> directly – no conversion needed
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => FishImageSearch(
-                                  allSpecies: allSpecies,
-                                ),
+                                builder: (_) => FishImageSearch(allFish: allFish),
                               ),
                             );
                           },

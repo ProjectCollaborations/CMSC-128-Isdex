@@ -29,6 +29,9 @@ dependencies:
   flutter_markdown: ^0.7.7+1
   provider: ^6.1.5+1
 
+  tflite_plus: ^1.0.3
+  image: ^4.5.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -50,3 +53,5 @@ flutter:
     - .env
     - assets/images/
     - assets/images/fish/
+    - assets/models/1.tflite
+    - assets/models/labels.txt
