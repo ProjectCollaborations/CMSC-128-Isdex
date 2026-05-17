@@ -504,8 +504,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final shortcuts = [
       {'label': 'Identify Fish', 'icon': Icons.search},
       {'label': 'Log Sighting', 'icon': Icons.add_location_alt},
-      {'label': 'Nearby Sightings', 'icon': Icons.map},
-      {'label': 'My Logbook', 'icon': Icons.book},
       {'label': 'Browse Index', 'icon': Icons.list_alt},
     ];
 
@@ -613,8 +611,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _focusNode.requestFocus();
         break;
       case 'Log Sighting':
-      case 'Nearby Sightings':
-      case 'My Logbook':
         Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSightingsMapScreen()));
         break;
       case 'Browse Index':
