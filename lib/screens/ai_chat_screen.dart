@@ -344,6 +344,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 

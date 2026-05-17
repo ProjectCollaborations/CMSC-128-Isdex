@@ -205,6 +205,7 @@ void _showDeleteCommentDialog(
           onPressed: () async {
             Navigator.pop(context); // Close dialog FIRST
             await commentsRef.child(commentId).remove();
+            if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Comment deleted')),
             );

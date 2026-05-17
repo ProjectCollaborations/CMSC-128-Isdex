@@ -1,6 +1,7 @@
 // lib/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -52,7 +53,7 @@ class AuthService {
       
       return user;
     } on FirebaseAuthException catch (e) {
-      print('Sign up error: ${e.message}');
+      debugPrint('Sign up error: ${e.message}');
       rethrow;
     }
   }
@@ -66,7 +67,7 @@ class AuthService {
       );
       return result.user;
     } on FirebaseAuthException catch (e) {
-      print('Sign in error: ${e.message}');
+      debugPrint('Sign in error: ${e.message}');
       rethrow;
     }
   }
@@ -81,7 +82,7 @@ class AuthService {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
     } on FirebaseAuthException catch (e) {
-      print('Password reset error: ${e.message}');
+      debugPrint('Password reset error: ${e.message}');
       rethrow;
     }
   }
@@ -95,7 +96,7 @@ class AuthService {
       }
       return 'user'; // Default fallback if no role is found
     } catch (e) {
-      print('Error getting role: $e');
+      debugPrint('Error getting role: $e');
       return 'user';
     }
   }

@@ -191,7 +191,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       if (!serviceEnabled) return;
 
       final Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final LatLng latLng = LatLng(position.latitude, position.longitude);
@@ -249,10 +251,11 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               child: GestureDetector(
                 onTap: () async {
                   if (!mounted) return;
+                  final markerContext = context;
 
                   final action = await showDialog<String>(
-                    context: context,
-                    builder: (context) => SimpleDialog(
+                    context: markerContext,
+                    builder: (dialogContext) => SimpleDialog(
                       title: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -274,20 +277,21 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                       ),
                       children: [
                         SimpleDialogOption(
-                          onPressed: () => Navigator.pop(context, 'viewInfo'),
+                          onPressed: () => Navigator.pop(dialogContext, 'viewInfo'),
                           child: const Text('View sighting details', style: TextStyle(fontSize: 16)),
                         ),
                         SimpleDialogOption(
-                          onPressed: () => Navigator.pop(context, 'viewFish'),
+                          onPressed: () => Navigator.pop(dialogContext, 'viewFish'),
                           child: const Text('View fish information page', style: TextStyle(fontSize: 16)),
                         ),
                       ],
                     ),
                   );
+                  if (!markerContext.mounted) return;
 
                   if (action == 'viewFish') {
                     if (fishId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(markerContext).showSnackBar(
                         const SnackBar(content: Text('This sighting is not linked to a fish.')),
                       );
                       return;
@@ -295,14 +299,14 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     final fishSnap = await _db.child('fish').child(fishId).get();
                     if (fishSnap.exists && fishSnap.value != null) {
                       final fishData = Map<dynamic, dynamic>.from(fishSnap.value as Map<dynamic, dynamic>);
-                      if (mounted) {
-                        Navigator.push(context, MaterialPageRoute(
+                      if (markerContext.mounted) {
+                        Navigator.push(markerContext, MaterialPageRoute(
                           builder: (context) => FishDetailPage(fish: fishData),
                         ));
                       }
                     } else {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                      if (markerContext.mounted) {
+                        ScaffoldMessenger.of(markerContext).showSnackBar(
                           const SnackBar(content: Text('Fish details not found.')),
                         );
                       }
@@ -368,7 +372,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                                     onPressed: () async {
                                       Navigator.pop(context);
                                       await _db.child('user_sightings_temp').child(key.toString()).remove();
-                                      if (mounted) {
+                                      if (context.mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           const SnackBar(content: Text('Sighting deleted')),
                                         );
@@ -387,7 +391,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                                       Navigator.pop(context);
                                       // Flag the sighting in the database
                                       await _db.child('user_sightings_temp').child(key.toString()).update({'isReported': true});
-                                      if (mounted) {
+                                      if (context.mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           const SnackBar(
                                             content: Text('Sighting reported to moderators.'),
@@ -483,7 +487,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
       // 2. Get position
       final Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final LatLng latLng = LatLng(position.latitude, position.longitude);

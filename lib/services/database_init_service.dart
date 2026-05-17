@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseInitService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -661,9 +662,9 @@ class DatabaseInitService {
       for (var fish in fishData) {
         await _db.child('fish').child(fish['fishId']).set(fish);
       }
-      print('✅ 50 Fish records initialized successfully');
+      debugPrint('✅ 50 Fish records initialized successfully');
     } catch (e) {
-      print('❌ Error initializing fish: $e');
+      debugPrint('❌ Error initializing fish: $e');
     }
   }
 
@@ -829,9 +830,9 @@ class DatabaseInitService {
       for (var location in mapData) {
         await _db.child('map').child(location['locationId']).set(location);
       }
-      print('✅ Map locations initialized successfully (with extra locations)');
+      debugPrint('✅ Map locations initialized successfully (with extra locations)');
     } catch (e) {
-      print('❌ Error initializing map locations: $e');
+      debugPrint('❌ Error initializing map locations: $e');
     }
   }
 
@@ -839,6 +840,6 @@ class DatabaseInitService {
   Future<void> initializeAllData() async {
     await initializeFish();
     await initializeMapLocations();
-    print('✅ All data initialization complete');
+    debugPrint('✅ All data initialization complete');
   }
 }

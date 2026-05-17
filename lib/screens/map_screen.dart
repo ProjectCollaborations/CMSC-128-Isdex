@@ -73,7 +73,9 @@ class _MapScreenState extends State<MapScreen> {
 
       // 3. Get current position
       final Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final LatLng myLatLng = LatLng(position.latitude, position.longitude);

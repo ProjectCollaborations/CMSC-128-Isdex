@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
-import 'package:path_provider/path_provider.dart';
 import 'fish_detail_page.dart';
 
 class FishImageSearch extends StatefulWidget {
@@ -55,7 +53,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
     try {
       await _recognizeFishWithMLKit(imageFile);
     } catch (e) {
-      print('Recognition error: $e');
+      debugPrint('Recognition error: $e');
       if (mounted) {
         setState(() {
           _statusMessage = 'Recognition failed. Please try manual search below:';
@@ -88,7 +86,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
       for (ImageLabel label in labels) {
         if (label.confidence > 0.5) {
           detectedLabels.add(label.label.toLowerCase());
-          print('Detected: ${label.label} (${(label.confidence * 100).toStringAsFixed(1)}%)');
+          debugPrint('Detected: ${label.label} (${(label.confidence * 100).toStringAsFixed(1)}%)');
         }
       }
 
@@ -113,7 +111,7 @@ class _FishImageSearchState extends State<FishImageSearch> {
       });
 
     } catch (e) {
-      print('ML Kit processing error: $e');
+      debugPrint('ML Kit processing error: $e');
       if (mounted) {
         setState(() {
           _statusMessage = 'Recognition error (${e.toString().split('\n').first}). Please try manual search:';

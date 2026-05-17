@@ -255,7 +255,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     final String recordKey = isEdit
-        ? existingFish!['key'].toString()
+        ? existingFish['key'].toString()
         : fishIdController.text.trim();
 
     final List<String> identifyingFeatures = identifyingFeaturesController.text
@@ -958,7 +958,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -1091,7 +1091,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               : Border.all(color: Colors.grey[100]!, width: 1),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -1272,7 +1272,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -1385,7 +1385,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: Colors.grey[100]!, width: 1),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2)),
                           ],
                         ),
                         child: Column(
@@ -1548,7 +1548,7 @@ Widget _actionButton({required IconData icon, required Color color, required Str
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
         child: Icon(icon, size: 18, color: color),
       ),
     ),
