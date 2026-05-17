@@ -81,6 +81,7 @@ GoogleService-Info.plist
 # ── Agent tooling ─────────────────────────────────────────────────
 .opencode/
 .memsearch/
+docs/superpowers/
 
 # ── Misc / OS ─────────────────────────────────────────────────────
 .env
