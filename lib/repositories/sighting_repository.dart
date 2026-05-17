@@ -52,4 +52,19 @@ class SightingRepository {
   Future<void> archive(String id) async {
     await _db.child(FirebaseNodes.sightingById(id)).remove();
   }
+
+  Future<void> reportSighting(String id) async {
+    await _db.child(FirebaseNodes.sightingById(id)).update({'isReported': true});
+  }
+
+  Future<void> updateGeoValidation(String id, String status, String message) async {
+    await _db.child(FirebaseNodes.sightingById(id)).update({
+      'geoValidationStatus': status,
+      'geoValidationMessage': message,
+    });
+  }
+
+  Future<void> delete(String id) async {
+    await _db.child(FirebaseNodes.sightingById(id)).remove();
+  }
 }
