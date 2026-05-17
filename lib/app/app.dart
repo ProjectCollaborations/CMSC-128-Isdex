@@ -35,7 +35,7 @@ class _IsDexAppState extends State<IsDexApp> {
       FirebaseDatabase.instance.setPersistenceCacheSizeBytes(10 * 1024 * 1024);
     }
     _db = FirebaseDatabase.instance.ref();
-    _authRepo = AuthRepository(AuthService(), _db);
+    _authRepo = AuthRepository(AuthService(_db), _db);
     _authVm = AuthViewModel(_authRepo);
   }
 
