@@ -97,7 +97,13 @@ class SightingsQueueView extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.read<AdminViewModel>().deleteSighting(id);
+              context.read<AdminViewModel>().deleteSighting(id).catchError((e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Delete failed: $e')),
+                  );
+                }
+              });
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),

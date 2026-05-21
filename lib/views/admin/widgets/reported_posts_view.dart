@@ -20,7 +20,7 @@ class ReportedPostsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<AdminViewModel>();
 
-    if (vm.sightingsLoading) {
+    if (vm.reportsLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -35,21 +35,95 @@ class ReportedPostsView extends StatelessWidget {
       itemCount: vm.reportedPosts.length,
       itemBuilder: (context, index) {
         final post = vm.reportedPosts[index];
-        return _ReportedPostCard(post: post);
+        return _ReportedPostCard(
+          post: post,
+          isProcessing: vm.isProcessing,
+          onDismiss: () => _confirmDismiss(context, post.id),
+          onArchive: () => _confirmArchive(context, post.id),
+        );
       },
+    );
+  }
+
+  void _confirmArchive(BuildContext context, String postId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Archive Post'),
+        content: const Text(
+          'This will remove the post from the community. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AdminViewModel>().archiveReportedPost(postId).catchError((e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Archive failed: $e')),
+                  );
+                }
+              });
+            },
+            child: const Text('Archive', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDismiss(BuildContext context, String postId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dismiss Report'),
+        content: const Text(
+          'This will remove the report flag from this post. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AdminViewModel>().dismissReport(postId).catchError((e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Dismiss failed: $e')),
+                  );
+                }
+              });
+            },
+            child: const Text('Dismiss',
+                style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _ReportedPostCard extends StatelessWidget {
   final CommunityPost post;
+  final bool isProcessing;
+  final VoidCallback onDismiss;
+  final VoidCallback onArchive;
 
-  const _ReportedPostCard({required this.post});
+  const _ReportedPostCard({
+    required this.post,
+    required this.isProcessing,
+    required this.onDismiss,
+    required this.onArchive,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.read<AdminViewModel>();
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -107,18 +181,14 @@ class _ReportedPostCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton.icon(
-                  onPressed: vm.isProcessing
-                      ? null
-                      : () => _confirmDismiss(context, post.id),
+                  onPressed: isProcessing ? null : onDismiss,
                   icon: const Icon(Icons.check_circle, color: Colors.green),
                   label: const Text('Dismiss',
                       style: TextStyle(color: Colors.green)),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: vm.isProcessing
-                      ? null
-                      : () => _confirmArchive(context, post.id),
+                  onPressed: isProcessing ? null : onArchive,
                   icon: const Icon(Icons.delete, color: Colors.white),
                   label: const Text('Archive'),
                   style: ElevatedButton.styleFrom(
@@ -159,56 +229,5 @@ class _ReportedPostCard extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.month}/${dt.day}/${dt.year}';
-  }
-
-  void _confirmArchive(BuildContext context, String postId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Archive Post'),
-        content: const Text(
-          'This will remove the post from the community. Are you sure?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AdminViewModel>().archiveReportedPost(postId);
-            },
-            child: const Text('Archive', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDismiss(BuildContext context, String postId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Dismiss Report'),
-        content: const Text(
-          'This will remove the report flag from this post. Are you sure?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AdminViewModel>().dismissReport(postId);
-            },
-            child: const Text('Dismiss',
-                style: TextStyle(color: Colors.green)),
-          ),
-        ],
-      ),
-    );
   }
 }
