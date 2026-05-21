@@ -53,8 +53,19 @@ class _AdminScreenState extends State<AdminScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await context.read<AuthViewModel>().signOut();
-              if (context.mounted) context.go('/');
+              try {
+                await context.read<AuthViewModel>().signOut();
+                if (context.mounted) context.go('/');
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Logout failed: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],

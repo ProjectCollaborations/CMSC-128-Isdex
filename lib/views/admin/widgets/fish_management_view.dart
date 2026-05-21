@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
-import '../../../models/fish.dart';
 import 'fish_form_dialog.dart';
 
 class FishManagementView extends StatelessWidget {
@@ -33,7 +32,7 @@ class FishManagementView extends StatelessWidget {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: vm.habitatFilter,
+                  initialValue: vm.habitatFilter,
                   decoration: const InputDecoration(
                     labelText: 'Habitat',
                     contentPadding:
@@ -52,7 +51,7 @@ class FishManagementView extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: vm.sortMode,
+                  initialValue: vm.sortMode,
                   decoration: const InputDecoration(
                     labelText: 'Sort',
                     contentPadding:
@@ -101,12 +100,86 @@ class FishManagementView extends StatelessWidget {
               ? const Center(child: CircularProgressIndicator())
               : vm.filteredFish.isEmpty
                   ? const Center(child: Text('No fish found'))
-                  : ListView.builder(
-                      itemCount: vm.filteredFish.length,
-                      itemBuilder: (context, index) {
-                        final fish = vm.filteredFish[index];
-                        return _FishCard(fish: fish);
-                      },
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: DataTable(
+                        columnSpacing: 24,
+                        columns: const [
+                          DataColumn(label: Text('Common Name')),
+                          DataColumn(label: Text('Scientific Name')),
+                          DataColumn(label: Text('Habitat')),
+                          DataColumn(label: Text('Status')),
+                          DataColumn(label: Text('Actions')),
+                        ],
+                        rows: vm.filteredFish.map((fish) {
+                          final isArchived = vm.showArchivedFish;
+                          return DataRow(cells: [
+                            DataCell(Text(fish.commonName)),
+                            DataCell(Text(fish.scientificName)),
+                            DataCell(Text(fish.habitat)),
+                            DataCell(Text(fish.conservationStatus)),
+                            DataCell(Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit,
+                                      color: Colors.blue),
+                                  tooltip: 'Edit',
+                                  onPressed: () => showDialog(
+                                    context: context,
+                                    builder: (_) =>
+                                        FishFormDialog(fish: fish),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    isArchived
+                                        ? Icons.restore
+                                        : Icons.archive,
+                                    color: Colors.orange,
+                                  ),
+                                  tooltip:
+                                      isArchived ? 'Restore' : 'Archive',
+                                  onPressed: () {
+                                    if (isArchived) {
+                                      vm.restoreFish(fish.id).catchError(
+                                          (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content:
+                                                    Text(e.toString())),
+                                          );
+                                        }
+                                      });
+                                    } else {
+                                      vm.archiveFish(fish.id).catchError(
+                                          (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content:
+                                                    Text(e.toString())),
+                                          );
+                                        }
+                                      });
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_forever,
+                                      color: Colors.red),
+                                  tooltip: 'Permanently delete',
+                                  onPressed: () => _confirmHardDelete(
+                                      context, fish.id, isArchived),
+                                ),
+                              ],
+                            )),
+                          ]);
+                        }).toList(),
+                      ),
                     ),
         ),
       ],
@@ -117,79 +190,6 @@ class FishManagementView extends StatelessWidget {
     showDialog(
       context: context,
       builder: (_) => const FishFormDialog(),
-    );
-  }
-}
-
-class _FishCard extends StatelessWidget {
-  final Fish fish;
-
-  const _FishCard({required this.fish});
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.read<AdminViewModel>();
-    final isArchived = vm.showArchivedFish;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue[100],
-          child: Text(
-            fish.commonName.isNotEmpty
-                ? fish.commonName[0].toUpperCase()
-                : '?',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(fish.commonName,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          '${fish.scientificName}  •  ${fish.habitat}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              tooltip: 'Edit',
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => FishFormDialog(fish: fish),
-                );
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                isArchived ? Icons.restore : Icons.archive,
-                color: Colors.orange,
-              ),
-              tooltip: isArchived ? 'Restore' : 'Archive',
-              onPressed: () {
-                if (isArchived) {
-                  vm.restoreFish(fish.id);
-                } else {
-                  vm.archiveFish(fish.id).catchError((e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(e.toString())),
-                      );
-                    }
-                  });
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_forever, color: Colors.red),
-              tooltip: 'Permanently delete',
-              onPressed: () => _confirmHardDelete(context, fish.id, isArchived),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

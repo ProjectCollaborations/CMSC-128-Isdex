@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../models/community_post.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
 
 class ReportedPostsView extends StatelessWidget {
@@ -28,7 +29,7 @@ class ReportedPostsView extends StatelessWidget {
 }
 
 class _ReportedPostCard extends StatelessWidget {
-  final dynamic post;
+  final CommunityPost post;
 
   const _ReportedPostCard({required this.post});
 
@@ -105,7 +106,7 @@ class _ReportedPostCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: vm.isProcessing
                       ? null
-                      : () => vm.dismissReport(post.id),
+                      : () => _confirmDismiss(context, post.id),
                   icon: const Icon(Icons.check_circle, color: Colors.green),
                   label: const Text('Dismiss',
                       style: TextStyle(color: Colors.green)),
@@ -160,6 +161,32 @@ class _ReportedPostCard extends StatelessWidget {
               context.read<AdminViewModel>().archiveReportedPost(postId);
             },
             child: const Text('Archive', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDismiss(BuildContext context, String postId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dismiss Report'),
+        content: const Text(
+          'This will remove the report flag from this post. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AdminViewModel>().dismissReport(postId);
+            },
+            child: const Text('Dismiss',
+                style: TextStyle(color: Colors.green)),
           ),
         ],
       ),

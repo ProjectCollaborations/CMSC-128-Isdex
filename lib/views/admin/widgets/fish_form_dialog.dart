@@ -91,7 +91,7 @@ class _FishFormDialogState extends State<FishFormDialog> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final vm = context.read<AdminViewModel>();
     final fish = Fish(
@@ -170,7 +170,7 @@ class _FishFormDialogState extends State<FishFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _habitat,
+                  initialValue: _habitat,
                   decoration: const InputDecoration(
                     labelText: 'Habitat *',
                     border: OutlineInputBorder(),
@@ -200,7 +200,7 @@ class _FishFormDialogState extends State<FishFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _conservationStatus,
+                  initialValue: _conservationStatus,
                   decoration: const InputDecoration(
                     labelText: 'Conservation Status',
                     border: OutlineInputBorder(),

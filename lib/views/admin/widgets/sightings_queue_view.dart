@@ -42,14 +42,14 @@ class SightingsQueueView extends StatelessWidget {
                     ? vm.approveSelected
                     : null,
                 icon: const Icon(Icons.check, color: Colors.green),
-                label: const Text('Approve'),
+                label: const Text('Approve Selected'),
               ),
               TextButton.icon(
                 onPressed: vm.selectedIds.isNotEmpty && !vm.isProcessing
                     ? vm.archiveSelected
                     : null,
                 icon: const Icon(Icons.archive, color: Colors.orange),
-                label: const Text('Archive'),
+                label: const Text('Archive Selected'),
               ),
             ],
           ),

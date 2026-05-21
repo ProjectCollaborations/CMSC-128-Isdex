@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
 import '../../../viewmodels/auth_viewmodel.dart';
-import '../../../models/app_user.dart';
 
 class UserManagementView extends StatelessWidget {
   const UserManagementView({super.key});
@@ -23,111 +22,79 @@ class UserManagementView extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(8),
-      itemCount: vm.users.length,
-      itemBuilder: (context, index) {
-        final user = vm.users[index];
-        final isSelf = user.uid == currentUid;
-        return _UserCard(user: user, isSelf: isSelf);
-      },
-    );
-  }
-}
-
-class _UserCard extends StatelessWidget {
-  final AppUser user;
-  final bool isSelf;
-
-  const _UserCard({required this.user, required this.isSelf});
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.read<AdminViewModel>();
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: _roleColor(user.role).withOpacity(0.2),
-              child: Text(
-                user.username.isNotEmpty
-                    ? user.username[0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _roleColor(user.role),
+      child: DataTable(
+        columnSpacing: 24,
+        columns: const [
+          DataColumn(label: Text('Username')),
+          DataColumn(label: Text('Email')),
+          DataColumn(label: Text('Role')),
+          DataColumn(label: Text('Manage Access')),
+        ],
+        rows: vm.users.map((user) {
+          final isSelf = user.uid == currentUid;
+          return DataRow(cells: [
+            DataCell(Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor:
+                      _roleColor(user.role).withValues(alpha: 0.2),
+                  child: Text(
+                    user.username.isNotEmpty
+                        ? user.username[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _roleColor(user.role),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(user.username),
+                if (isSelf)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 6),
+                    child: Chip(
+                      label: Text('You',
+                          style: TextStyle(fontSize: 10)),
+                      padding: EdgeInsets.zero,
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
+            )),
+            DataCell(Text(user.email)),
+            DataCell(_RoleChip(role: user.role)),
+            DataCell(
+              SizedBox(
+                width: 120,
+                child: DropdownButtonFormField<String>(
+                  initialValue: user.role,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    isDense: true,
+                  ),
+                  items: ['user', 'mod', 'admin']
+                      .map((r) =>
+                          DropdownMenuItem(value: r, child: Text(r)))
+                      .toList(),
+                  onChanged: isSelf || vm.usersProcessing
+                      ? null
+                      : (v) {
+                          if (v != null) {
+                            vm.updateUserRole(user.uid, v);
+                          }
+                        },
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        user.username,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      if (isSelf)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 6),
-                          child: Chip(
-                            label: Text('You',
-                                style: TextStyle(fontSize: 10)),
-                            padding: EdgeInsets.zero,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(user.email,
-                      style: TextStyle(
-                          fontSize: 13, color: Colors.grey[600])),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            _RoleChip(role: user.role),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 100,
-              child: isSelf
-                  ? const Text('(You)',
-                      style: TextStyle(
-                          fontStyle: FontStyle.italic, color: Colors.grey))
-                  : DropdownButtonFormField<String>(
-                      value: user.role,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8),
-                        isDense: true,
-                      ),
-                      items: ['user', 'mod', 'admin']
-                          .map((r) =>
-                              DropdownMenuItem(value: r, child: Text(r)))
-                          .toList(),
-                      onChanged: vm.usersProcessing
-                          ? null
-                          : (v) {
-                              if (v != null) {
-                                vm.updateUserRole(user.uid, v);
-                              }
-                            },
-                    ),
-            ),
-          ],
-        ),
+          ]);
+        }).toList(),
       ),
     );
   }
