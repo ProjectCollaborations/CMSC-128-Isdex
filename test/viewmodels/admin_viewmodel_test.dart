@@ -123,22 +123,6 @@ void main() {
     geoValidationMessage: '',
   );
 
-  final sightingNonWater = Sighting(
-    id: 's3',
-    fishName: 'Bangus',
-    fishId: 'fish3',
-    displayName: 'User3',
-    userId: 'u3',
-    notes: '',
-    latitude: 14.5,
-    longitude: 121.0,
-    createdAt: '0',
-    status: SightingStatus.pending,
-    isAnonymous: false,
-    geoValidationStatus: 'land',
-    geoValidationMessage: 'GPS coordinate maps to land area',
-  );
-
   final post1 = CommunityPost(
     id: 'p1',
     uid: 'u1',
@@ -919,6 +903,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
 
       expect(disposedVm!.fishCatalog, isEmpty);
+      expect(notifyCount, 0);
     });
   });
 }
