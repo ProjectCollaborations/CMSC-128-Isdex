@@ -57,9 +57,11 @@ class AdminViewModel extends ChangeNotifier {
 
   // ── Tab 1: Reports ──
   List<CommunityPost> _reportedPosts = [];
+  bool _reportsLoading = true;
 
   // ── Tab 2: Fish ──
   List<Fish> _fishCatalog = [];
+  bool _fishCatalogLoading = true;
   List<Fish> _archivedFish = [];
   String _searchQuery = '';
   String _habitatFilter = 'All';
@@ -69,6 +71,7 @@ class AdminViewModel extends ChangeNotifier {
 
   // ── Tab 3: Users ──
   List<AppUser> _users = [];
+  bool _usersLoading = true;
   bool _usersProcessing = false;
 
   // ── Subscriptions ──
@@ -84,6 +87,9 @@ class AdminViewModel extends ChangeNotifier {
   List<Sighting> get sightings => _sightings;
   Set<String> get selectedIds => _selectedIds;
   bool get sightingsLoading => _sightingsLoading;
+  bool get reportsLoading => _reportsLoading;
+  bool get fishCatalogLoading => _fishCatalogLoading;
+  bool get usersLoading => _usersLoading;
   bool get isProcessing => _isProcessing;
 
   List<CommunityPost> get reportedPosts => _reportedPosts;
@@ -186,15 +192,15 @@ class AdminViewModel extends ChangeNotifier {
 
   void _startListening() {
     _subs.add(_watchAllSightings().listen(_onSightingsChanged,
-        onError: (_) {}));
+        onError: (e) { debugPrint('Admin stream error: $e'); }));
     _subs.add(_watchReportedPosts().listen(_onReportedPostsChanged,
-        onError: (_) {}));
+        onError: (e) { debugPrint('Admin stream error: $e'); }));
     _subs.add(_watchFishCatalog().listen(_onFishCatalogChanged,
-        onError: (_) {}));
+        onError: (e) { debugPrint('Admin stream error: $e'); }));
     _subs.add(_watchArchivedFish().listen(_onArchivedFishChanged,
-        onError: (_) {}));
+        onError: (e) { debugPrint('Admin stream error: $e'); }));
     _subs.add(_watchUsers().listen(_onUsersChanged,
-        onError: (_) {}));
+        onError: (e) { debugPrint('Admin stream error: $e'); }));
   }
 
   void _onSightingsChanged(List<Sighting> sightings) {
@@ -209,12 +215,14 @@ class AdminViewModel extends ChangeNotifier {
   void _onReportedPostsChanged(List<CommunityPost> posts) {
     if (_disposed) return;
     _reportedPosts = posts;
+    _reportsLoading = false;
     notifyListeners();
   }
 
   void _onFishCatalogChanged(List<Fish> fish) {
     if (_disposed) return;
     _fishCatalog = fish;
+    _fishCatalogLoading = false;
     notifyListeners();
   }
 
@@ -227,6 +235,7 @@ class AdminViewModel extends ChangeNotifier {
   void _onUsersChanged(List<AppUser> users) {
     if (_disposed) return;
     _users = users;
+    _usersLoading = false;
     notifyListeners();
   }
 
@@ -437,16 +446,19 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   void setSearchQuery(String query) {
+    if (query == _searchQuery) return;
     _searchQuery = query;
     notifyListeners();
   }
 
   void setHabitatFilter(String filter) {
+    if (filter == _habitatFilter) return;
     _habitatFilter = filter;
     notifyListeners();
   }
 
   void setSortMode(String mode) {
+    if (mode == _sortMode) return;
     _sortMode = mode;
     notifyListeners();
   }
