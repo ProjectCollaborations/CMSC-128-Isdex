@@ -59,9 +59,10 @@ class ReportedPostsView extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.read<AdminViewModel>().archiveReportedPost(postId).then((_) {
+              try {
+                await context.read<AdminViewModel>().archiveReportedPost(postId);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -70,13 +71,13 @@ class ReportedPostsView extends StatelessWidget {
                     ),
                   );
                 }
-              }).catchError((e) {
+              } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Archive failed: $e')),
                   );
                 }
-              });
+              }
             },
             child: const Text('Archive', style: TextStyle(color: Colors.red)),
           ),
@@ -99,9 +100,10 @@ class ReportedPostsView extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.read<AdminViewModel>().dismissReport(postId).then((_) {
+              try {
+                await context.read<AdminViewModel>().dismissReport(postId);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -110,13 +112,13 @@ class ReportedPostsView extends StatelessWidget {
                     ),
                   );
                 }
-              }).catchError((e) {
+              } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Dismiss failed: $e')),
                   );
                 }
-              });
+              }
             },
             child: const Text('Dismiss',
                 style: TextStyle(color: Colors.green)),
