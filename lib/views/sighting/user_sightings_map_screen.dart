@@ -12,6 +12,8 @@ import '../../repositories/fish_repository.dart';
 import '../../services/geo_validation_service.dart';
 import '../../core/constants/app_theme.dart';
 
+enum _SightingLocationMode { currentLocation, mapSelection }
+
 class UserSightingsMapScreen extends StatefulWidget {
   const UserSightingsMapScreen({super.key});
 
@@ -23,7 +25,9 @@ class UserSightingsMapScreen extends StatefulWidget {
 class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   final MapController _mapController = MapController();
   LatLng? _userLocation;
+  LatLng? _selectedSightingLocation;
   bool _isLocating = false;
+  bool _isSelectingSightingLocation = false;
   SightingViewModel? _sightingVm;
 
   @override
@@ -104,6 +108,62 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       return;
     }
 
+    await _showLocationChoiceSheet(user.email);
+  }
+
+  Future<void> _showLocationChoiceSheet(String userEmail) async {
+    final mode = await showModalBottomSheet<_SightingLocationMode>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 20, 24, 4),
+              child: Text(
+                'Choose location method',
+                style: TextStyle(
+                  color: AppTheme.navy900,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.my_location, color: AppTheme.teal400),
+              title: const Text('Use current location',
+                  style: TextStyle(fontWeight: FontWeight.w500)),
+              subtitle: const Text('Add the sighting at your GPS position'),
+              onTap: () =>
+                  Navigator.pop(ctx, _SightingLocationMode.currentLocation),
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_location_alt, color: AppTheme.navy500),
+              title: const Text('Choose on map',
+                  style: TextStyle(fontWeight: FontWeight.w500)),
+              subtitle: const Text('Tap anywhere on the map to place the pin'),
+              onTap: () =>
+                  Navigator.pop(ctx, _SightingLocationMode.mapSelection),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || mode == null) return;
+
+    if (mode == _SightingLocationMode.currentLocation) {
+      await _addSightingAtCurrentLocation(userEmail);
+    } else {
+      _startMapLocationSelection();
+    }
+  }
+
+  Future<void> _addSightingAtCurrentLocation(String userEmail) async {
     setState(() => _isLocating = true);
 
     try {
@@ -139,7 +199,11 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       if (mounted) {
         setState(() => _userLocation = latLng);
         _mapController.move(latLng, 14.0);
-        await _showAddSightingDialog(latLng, user.email);
+        await _showAddSightingDialog(
+          latLng,
+          userEmail,
+          _SightingLocationMode.currentLocation,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -152,7 +216,59 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     }
   }
 
-  Future<void> _showAddSightingDialog(LatLng latLng, String userEmail) async {
+  void _startMapLocationSelection() {
+    setState(() {
+      _isSelectingSightingLocation = true;
+      _selectedSightingLocation = null;
+    });
+  }
+
+  void _cancelMapLocationSelection() {
+    setState(() {
+      _isSelectingSightingLocation = false;
+      _selectedSightingLocation = null;
+    });
+  }
+
+  Future<void> _confirmSelectedSightingLocation() async {
+    final selected = _selectedSightingLocation;
+    if (selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tap the map to choose a location first.'),
+        ),
+      );
+      return;
+    }
+
+    final user = context.read<AuthViewModel>().user;
+    if (user == null) {
+      _cancelMapLocationSelection();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be logged in to add a sighting.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSelectingSightingLocation = false;
+      _selectedSightingLocation = null;
+    });
+
+    await _showAddSightingDialog(
+      selected,
+      user.email,
+      _SightingLocationMode.mapSelection,
+    );
+  }
+
+  Future<void> _showAddSightingDialog(
+    LatLng latLng,
+    String userEmail,
+    _SightingLocationMode locationMode,
+  ) async {
     final sightingVm = _getSightingVm(context);
     String? selectedFishId;
     String? selectedFishName;
@@ -177,16 +293,29 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.my_location, size: 16, color: AppTheme.teal400),
+                      Icon(
+                        locationMode == _SightingLocationMode.currentLocation
+                            ? Icons.my_location
+                            : Icons.add_location_alt,
+                        size: 16,
+                        color: AppTheme.teal400,
+                      ),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Using your current GPS location',
-                          style: TextStyle(fontSize: 13, color: AppTheme.teal400),
+                          locationMode == _SightingLocationMode.currentLocation
+                              ? 'Using your current GPS location'
+                              : 'Using selected map location',
+                          style: const TextStyle(fontSize: 13, color: AppTheme.teal400),
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 16),
                 Text('Fish (common name)',
@@ -406,6 +535,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         child: GestureDetector(
           onTap: () {
             if (!mounted) return;
+            if (_isSelectingSightingLocation) return;
             _onMarkerTapped(sighting, isOwner, currentUid);
           },
           child: Column(
@@ -620,58 +750,146 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       appBar: AppBar(
         title: const Text('User Sightings Map'),
       ),
-      body: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: initialCenter,
-          initialZoom: 6.0,
-        ),
+      body: Stack(
         children: [
-          TileLayer(
-            urlTemplate:
-                'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.isdex',
-          ),
-          if (_userLocation != null)
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: _userLocation!,
-                  width: 60,
-                  height: 70,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppTheme.teal400,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 6),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(6),
-                        child: const Icon(Icons.my_location,
-                            color: Colors.white, size: 20),
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: initialCenter,
+              initialZoom: 6.0,
+              onTap: (_, latLng) {
+                if (!_isSelectingSightingLocation) return;
+                setState(() => _selectedSightingLocation = latLng);
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.isdex',
+              ),
+              if (_userLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _userLocation!,
+                      width: 60,
+                      height: 70,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.teal400,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black26, blurRadius: 6),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: const Icon(Icons.my_location,
+                                color: Colors.white, size: 20),
+                          ),
+                          const Text(
+                            'You',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.teal400,
+                            ),
+                          ),
+                        ],
                       ),
-                      const Text(
-                        'You',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.teal400,
+                    ),
+                  ],
+                ),
+              MarkerLayer(markers: markers),
+              if (_selectedSightingLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _selectedSightingLocation!,
+                      width: 70,
+                      height: 70,
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_location_alt,
+                              color: Colors.green, size: 46),
+                          Text(
+                            'Selected',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if (_isSelectingSightingLocation)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Material(
+                color: Colors.white,
+                elevation: 4,
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.touch_app, color: Colors.green),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Tap the map to choose sighting location',
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          MarkerLayer(markers: markers),
+          if (_isSelectingSightingLocation)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _cancelMapLocationSelection,
+                        icon: const Icon(Icons.close),
+                        label: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _selectedSightingLocation == null
+                            ? null
+                            : _confirmSelectedSightingLocation,
+                        icon: const Icon(Icons.check),
+                        label: const Text('Confirm location'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: authVm.isLoggedIn
+      floatingActionButton: !_isSelectingSightingLocation && authVm.isLoggedIn
           ? FloatingActionButton.extended(
               onPressed: _isLocating ? null : _startAddSighting,
               icon: _isLocating
