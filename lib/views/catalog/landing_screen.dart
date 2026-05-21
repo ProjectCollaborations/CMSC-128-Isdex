@@ -108,15 +108,35 @@ class _LandingScreenState extends State<LandingScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person, color: Colors.white),
-            onPressed: () {
+          GestureDetector(
+            onTap: () {
               if (!authVm.isLoggedIn) {
                 context.go('/login');
               } else {
                 _showUserMenu();
               }
             },
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (authVm.isLoggedIn)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        authVm.user?.username ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  const Icon(Icons.person, color: Colors.white),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -184,29 +204,39 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   Widget _buildHabitatFilters(FishCatalogViewModel catalogVm) {
-    return Container(
-      color: AppTheme.card,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: FishCatalogViewModel.habitats.map((habitat) {
-            final isSelected = catalogVm.selectedHabitat == habitat;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(habitat),
-                selected: isSelected,
-                onSelected: (_) =>
-                    context.read<FishCatalogViewModel>().filterByHabitat(habitat),
-                selectedColor: AppTheme.teal50,
-                side: BorderSide(
-                  color: isSelected ? AppTheme.teal400 : Colors.grey[300]!,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: FishCatalogViewModel.habitats.map((habitat) {
+          final isSelected = catalogVm.selectedHabitat == habitat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(
+                habitat,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textPrimary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
                 ),
               ),
-            );
-          }).toList(),
-        ),
+              selected: isSelected,
+              onSelected: (_) =>
+                  context.read<FishCatalogViewModel>().filterByHabitat(habitat),
+              selectedColor: AppTheme.navy500,
+              backgroundColor: Colors.white,
+              checkmarkColor: Colors.white,
+              side: BorderSide(
+                color: isSelected
+                    ? AppTheme.navy500
+                    : AppTheme.navy500.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+              showCheckmark: true,
+            ),
+          );
+        }).toList(),
       ),
     );
   }
