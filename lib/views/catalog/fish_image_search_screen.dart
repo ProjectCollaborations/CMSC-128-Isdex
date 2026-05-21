@@ -29,10 +29,13 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   Interpreter? _interpreter;
   List<String> _imagenetLabels = [];
   static const int _inputSize = 224;
-  static const int _outputSize = 1001; // ImageNet output classes
+  static const int _outputSize = 50; // ImageNet output classes
+
+  // Confidence tuning
+  static const double _temperature = 0.7;      // lower = sharper (0.5-0.8 works well)
+  static const double _minConfidence = 0.35;    // only show fish with score >= 40%
 
   // Expanded mapping from ImageNet keywords to your fish species.
-  // Keys are lowercase keywords (often singular), values are lists of exact fish common names.
   final Map<String, List<String>> _keywordToFish = {
     // Tuna family
     'tuna': ['Yellowfin Tuna', 'Tuna'],
@@ -276,7 +279,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   }
 
   // --------------------------------------------------------------
-  // Run inference and map results to local fish
+  // Run inference and map results to local fish (with temperature & threshold)
   // --------------------------------------------------------------
   Future<void> _classifyImage(File imageFile) async {
     if (_interpreter == null) return;
@@ -296,13 +299,13 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       }
 
       // 2. Create output tensor (1001 classes)
-      final output = List.filled(1 * 50, 0.0).reshape([1, 50]);
+      final output = List.filled(1 * _outputSize, 0.0).reshape([1, _outputSize]);
 
       // 3. Run inference
       _interpreter!.run(input, output);
 
-      // 4. Convert raw logits to probabilities (softmax)
-      final probabilities = _softmax(output[0]);
+      // 4. Convert raw logits to probabilities (with temperature scaling)
+      final probabilities = _softmax(output[0], temperature: _temperature);
 
       // 5. Get top 10 predictions
       final topPredictions = _getTopPredictions(probabilities, 10);
@@ -310,15 +313,18 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       // 6. Map ImageNet labels to your fish species
       final matched = _mapToLocalFish(topPredictions);
 
-      // 7. Update UI
+      // 7. Filter by minimum confidence
+      final filtered = matched.where((e) => e.$2 >= _minConfidence).toList();
+
+      // 8. Update UI
       setState(() {
-        if (matched.isEmpty) {
-          _statusMessage = 'No matching fish found. Try manual search.';
+        if (filtered.isEmpty) {
+          _statusMessage = 'No confident match (below ${(_minConfidence * 100).toInt()}%). Try manual search.';
           _matchedFish = [];
           _detectedLabels = [];
         } else {
-          _matchedFish = matched.map((e) => e.$1).toList();
-          _detectedLabels = matched.map((e) => '${e.$1.commonName} (${(e.$2 * 100).toStringAsFixed(1)}%)').toList();
+          _matchedFish = filtered.map((e) => e.$1).toList();
+          _detectedLabels = filtered.map((e) => '${e.$1.commonName} (${(e.$2 * 100).toStringAsFixed(1)}%)').toList();
           _statusMessage = '';
         }
         _isLoading = false;
@@ -332,13 +338,15 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
   }
 
-  // Softmax conversion
-  List<double> _softmax(List<double> logits) {
-    final maxLogit = logits.reduce((a, b) => a > b ? a : b);
-    final expValues = logits.map((x) => exp(x - maxLogit)).toList();
+  // Softmax with temperature scaling
+  List<double> _softmax(List<double> logits, {double temperature = 1.0}) {
+    final scaled = logits.map((x) => x / temperature).toList();
+    final maxLogit = scaled.reduce((a, b) => a > b ? a : b);
+    final expValues = scaled.map((x) => exp(x - maxLogit)).toList();
     final sumExp = expValues.reduce((a, b) => a + b);
     return expValues.map<double>((x) => x / sumExp).toList();
   }
+
   // Get top-K indices and labels
   List<(String, double)> _getTopPredictions(List<double> probabilities, int topK) {
     final indices = List.generate(probabilities.length, (i) => i);
@@ -413,7 +421,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
 
     setState(() => _isLoading = true);
-    // Simulate async search (could be instant but we add a small delay for UX)
     Future.delayed(const Duration(milliseconds: 100), () {
       final matches = widget.allSpecies.where((fish) {
         return fish.commonName.toLowerCase().contains(query) ||
@@ -443,13 +450,16 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   }
 
   // --------------------------------------------------------------
-  // UI BUILD (unchanged, but kept for completeness)
+  // UI BUILD (your original working UI, no AppTheme errors)
   // --------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search by Photo'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -489,9 +499,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Colors.grey[100],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surface),
+        border: Border.all(color: Colors.grey[200]!),
       ),
       child: _imageFile != null
           ? ClipRRect(
@@ -501,11 +511,11 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
           : Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.camera_alt, size: 48, color: AppTheme.textSecondary),
+                Icon(Icons.camera_alt, size: 48, color: Colors.grey[400]),
                 const SizedBox(height: 8),
                 Text(
                   'Take or select a photo of a fish',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -553,16 +563,16 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.teal50,
+        color: Colors.blue[50],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.teal200),
+        border: Border.all(color: Colors.blue[200]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, size: 16, color: AppTheme.navy500),
+              Icon(Icons.auto_awesome, size: 16, color: Colors.blue[700]),
               const SizedBox(width: 8),
               Text(
                 'AI Predictions:',
@@ -580,7 +590,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.teal200),
+                  border: Border.all(color: Colors.blue[200]!),
                 ),
                 child: Text(label, style: TextStyle(fontSize: 12, color: Colors.blue[800])),
               );
@@ -594,12 +604,12 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   Widget _buildDivider() {
     return Row(
       children: [
-        const Expanded(child: Divider()),
+        Expanded(child: Divider(color: Colors.grey[300])),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text('OR', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
         ),
-        const Expanded(child: Divider()),
+        Expanded(child: Divider(color: Colors.grey[300])),
       ],
     );
   }
@@ -608,24 +618,24 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.teal50,
+        color: Colors.green[50],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.teal200),
+        border: Border.all(color: Colors.green[200]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.search, size: 20, color: AppTheme.navy500),
+              Icon(Icons.search, size: 20, color: Colors.green[700]),
               const SizedBox(width: 8),
               const Text('Manual Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Search by common name, scientific name, or local name:',
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(height: 12),
           Row(
@@ -634,7 +644,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 child: TextField(
                   controller: _searchController,
                   enabled: !_isLoading,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Enter fish name...',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -677,11 +687,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(
         'Found ${_matchedFish.length} matching fish',
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-          color: AppTheme.textPrimary,
-        ),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
       ),
     );
   }
@@ -693,7 +699,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       itemCount: _matchedFish.length,
       itemBuilder: (context, i) {
         final fish = _matchedFish[i];
-        return AppCard(
+        return Card(
           margin: const EdgeInsets.only(bottom: 12),
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -748,13 +754,13 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                           decoration: BoxDecoration(color: Colors.blue[100], borderRadius: BorderRadius.circular(10)),
                           child: Text(fish.habitat, style: TextStyle(fontSize: 10, color: Colors.blue[800], fontWeight: FontWeight.w500)),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Icon(Icons.chevron_right, color: Colors.grey[400]),
+                ],
               ),
-              const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-            ],
+            ),
           ),
         );
       },
@@ -766,7 +772,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          const Icon(Icons.search_off, size: 64, color: AppTheme.textSecondary),
+          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(_statusMessage, style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
         ],
