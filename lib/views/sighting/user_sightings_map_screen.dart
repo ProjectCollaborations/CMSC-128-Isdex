@@ -10,6 +10,7 @@ import '../../models/sighting.dart';
 import '../../repositories/sighting_repository.dart';
 import '../../repositories/fish_repository.dart';
 import '../../services/geo_validation_service.dart';
+import '../../core/constants/app_theme.dart';
 
 class UserSightingsMapScreen extends StatefulWidget {
   const UserSightingsMapScreen({super.key});
@@ -170,12 +171,12 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.my_location, size: 16, color: Colors.blue),
+                    const Icon(Icons.my_location, size: 16, color: AppTheme.teal400),
                     const SizedBox(width: 6),
                     const Expanded(
                       child: Text(
                         'Using your current GPS location',
-                        style: TextStyle(fontSize: 13, color: Colors.blue),
+                        style: TextStyle(fontSize: 13, color: AppTheme.teal400),
                       ),
                     ),
                   ],
@@ -200,7 +201,6 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   },
                   decoration: const InputDecoration(
                     hintText: 'Select fish',
-                    border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -208,16 +208,15 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   controller: notesController,
                   decoration: const InputDecoration(
                     labelText: 'Notes (optional)',
-                    border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 16),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: AppTheme.textSecondary.withValues(alpha: 0.3)),
                   ),
                   child: SwitchListTile(
                     dense: true,
@@ -232,15 +231,15 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                           : 'Shown as: ${userEmail.split('@')[0]}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isAnonymous ? Colors.orange[700] : Colors.grey[600],
+                        color: isAnonymous ? Colors.orange : AppTheme.textSecondary,
                       ),
                     ),
                     secondary: Icon(
                       isAnonymous ? Icons.visibility_off : Icons.visibility,
-                      color: isAnonymous ? Colors.orange[700] : Colors.blue,
+                      color: isAnonymous ? Colors.orange : AppTheme.teal400,
                     ),
                     value: isAnonymous,
-                    activeThumbColor: Colors.orange[700],
+                    activeThumbColor: Colors.orange,
                     onChanged: (val) => setDialogState(() => isAnonymous = val),
                   ),
                 ),
@@ -380,8 +379,8 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               style: TextStyle(
                 fontSize: 13,
                 color: sighting.status == SightingStatus.pending
-                    ? Colors.orange[700]
-                    : Colors.grey[700],
+                    ? Colors.orange
+                    : AppTheme.textSecondary,
                 fontStyle: FontStyle.italic,
                 fontWeight: sighting.status == SightingStatus.pending
                     ? FontWeight.bold
@@ -444,7 +443,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               Row(
                 children: [
                   const Icon(Icons.person_outline,
-                      size: 16, color: Colors.grey),
+                      size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: 4),
                   Text(
                     isOwner
@@ -452,7 +451,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                         : 'Submitted by ${sighting.displayName}',
                     style: const TextStyle(
                         fontSize: 13,
-                        color: Colors.grey,
+                        color: AppTheme.textSecondary,
                         fontStyle: FontStyle.italic),
                   ),
                 ],
@@ -461,7 +460,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               Row(
                 children: [
                   const Icon(Icons.location_on_outlined,
-                      size: 16, color: Colors.grey),
+                      size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: 4),
                   Text(
                     'Near ${sighting.latitude.toStringAsFixed(2)}°, ${sighting.longitude.toStringAsFixed(2)}°',
@@ -492,10 +491,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                       }
                     },
                     icon: const Icon(Icons.delete,
-                        color: Colors.red, size: 22),
+                        color: AppTheme.error, size: 22),
                     label: const Text('Delete this pin',
                         style:
-                            TextStyle(color: Colors.red, fontSize: 14)),
+                            TextStyle(color: AppTheme.error, fontSize: 14)),
                   ),
                 )
               else if (sighting.status == SightingStatus.approved)
@@ -545,8 +544,6 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Sightings Map'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
       ),
       body: FlutterMap(
         mapController: _mapController,
@@ -568,7 +565,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   width: 60,
                   height: 60,
                   child: const Icon(Icons.my_location,
-                      color: Colors.blue, size: 38),
+                      color: AppTheme.teal400, size: 38),
                 ),
               ],
             ),
@@ -577,7 +574,6 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isLocating ? null : _startAddSighting,
-        backgroundColor: Colors.blue,
         icon: _isLocating
             ? const SizedBox(
                 width: 20,
@@ -586,10 +582,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     color: Colors.white, strokeWidth: 2),
               )
             : const Icon(Icons.add_location_alt, color: Colors.white),
-        label: Text(
-          _isLocating ? 'Locating...' : 'Add Sighting',
-          style: const TextStyle(color: Colors.white),
-        ),
+        label: Text(_isLocating ? 'Locating...' : 'Add Sighting'),
       ),
     );
   }
