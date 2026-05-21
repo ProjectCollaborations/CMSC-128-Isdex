@@ -11,18 +11,21 @@ import '../../repositories/sighting_repository.dart';
 import '../../repositories/fish_repository.dart';
 import '../../services/geo_validation_service.dart';
 
+enum _SightingLocationMode { currentLocation, mapSelection }
+
 class UserSightingsMapScreen extends StatefulWidget {
   const UserSightingsMapScreen({super.key});
 
   @override
-  State<UserSightingsMapScreen> createState() =>
-      _UserSightingsMapScreenState();
+  State<UserSightingsMapScreen> createState() => _UserSightingsMapScreenState();
 }
 
 class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   final MapController _mapController = MapController();
   LatLng? _userLocation;
+  LatLng? _selectedSightingLocation;
   bool _isLocating = false;
+  bool _isSelectingSightingLocation = false;
   SightingViewModel? _sightingVm;
 
   @override
@@ -90,7 +93,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     final user = authVm.user;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to add a sighting.')),
+        const SnackBar(
+          content: Text('You must be logged in to add a sighting.'),
+        ),
       );
       return;
     }
@@ -103,6 +108,49 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       return;
     }
 
+    await _showLocationChoiceSheet(user.email);
+  }
+
+  Future<void> _showLocationChoiceSheet(String userEmail) async {
+    final mode = await showModalBottomSheet<_SightingLocationMode>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.my_location, color: Colors.blue),
+              title: const Text('Use current location'),
+              subtitle: const Text('Add the sighting at your GPS position'),
+              onTap: () =>
+                  Navigator.pop(ctx, _SightingLocationMode.currentLocation),
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_location_alt, color: Colors.green),
+              title: const Text('Choose on map'),
+              subtitle: const Text('Tap anywhere on the map to place the pin'),
+              onTap: () =>
+                  Navigator.pop(ctx, _SightingLocationMode.mapSelection),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || mode == null) return;
+
+    if (mode == _SightingLocationMode.currentLocation) {
+      await _addSightingAtCurrentLocation(userEmail);
+    } else {
+      _startMapLocationSelection();
+    }
+  }
+
+  Future<void> _addSightingAtCurrentLocation(String userEmail) async {
     setState(() => _isLocating = true);
 
     try {
@@ -138,20 +186,76 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       if (mounted) {
         setState(() => _userLocation = latLng);
         _mapController.move(latLng, 14.0);
-        await _showAddSightingDialog(latLng, user.email);
+        await _showAddSightingDialog(
+          latLng,
+          userEmail,
+          _SightingLocationMode.currentLocation,
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not get location: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not get location: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLocating = false);
     }
   }
 
-  Future<void> _showAddSightingDialog(LatLng latLng, String userEmail) async {
+  void _startMapLocationSelection() {
+    setState(() {
+      _isSelectingSightingLocation = true;
+      _selectedSightingLocation = null;
+    });
+  }
+
+  void _cancelMapLocationSelection() {
+    setState(() {
+      _isSelectingSightingLocation = false;
+      _selectedSightingLocation = null;
+    });
+  }
+
+  Future<void> _confirmSelectedSightingLocation() async {
+    final selected = _selectedSightingLocation;
+    if (selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tap the map to choose a location first.'),
+        ),
+      );
+      return;
+    }
+
+    final user = context.read<AuthViewModel>().user;
+    if (user == null) {
+      _cancelMapLocationSelection();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be logged in to add a sighting.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSelectingSightingLocation = false;
+      _selectedSightingLocation = null;
+    });
+
+    await _showAddSightingDialog(
+      selected,
+      user.email,
+      _SightingLocationMode.mapSelection,
+    );
+  }
+
+  Future<void> _showAddSightingDialog(
+    LatLng latLng,
+    String userEmail,
+    _SightingLocationMode locationMode,
+  ) async {
     final sightingVm = _getSightingVm(context);
     String? selectedFishId;
     String? selectedFishName;
@@ -170,26 +274,48 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.my_location, size: 16, color: Colors.blue),
+                    Icon(
+                      locationMode == _SightingLocationMode.currentLocation
+                          ? Icons.my_location
+                          : Icons.add_location_alt,
+                      size: 16,
+                      color: Colors.blue,
+                    ),
                     const SizedBox(width: 6),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Using your current GPS location',
-                        style: TextStyle(fontSize: 13, color: Colors.blue),
+                        locationMode == _SightingLocationMode.currentLocation
+                            ? 'Using your current GPS location'
+                            : 'Using selected map location',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue,
+                        ),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
                 const SizedBox(height: 12),
-                const Text('Fish (common name)',
-                    style: TextStyle(fontWeight: FontWeight.w500)),
+                const Text(
+                  'Fish (common name)',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
                 const SizedBox(height: 4),
                 DropdownButtonFormField<String>(
                   initialValue: selectedFishId,
-                  items: sightingVm.fishList.map((f) => DropdownMenuItem<String>(
-                    value: f.id,
-                    child: Text(f.commonName),
-                  )).toList(),
+                  items: sightingVm.fishList
+                      .map(
+                        (f) => DropdownMenuItem<String>(
+                          value: f.id,
+                          child: Text(f.commonName),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (value) {
                     setDialogState(() {
                       selectedFishId = value;
@@ -224,7 +350,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     title: const Text(
                       'Post anonymously',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     subtitle: Text(
                       isAnonymous
@@ -232,7 +361,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                           : 'Shown as: ${userEmail.split('@')[0]}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isAnonymous ? Colors.orange[700] : Colors.grey[600],
+                        color: isAnonymous
+                            ? Colors.orange[700]
+                            : Colors.grey[600],
                       ),
                     ),
                     secondary: Icon(
@@ -256,7 +387,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               onPressed: () {
                 if (selectedFishId == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select a fish first.')),
+                    const SnackBar(
+                      content: Text('Please select a fish first.'),
+                    ),
                   );
                   return;
                 }
@@ -271,9 +404,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
     if (confirmed != true || selectedFishId == null) return;
 
-    final displayName = isAnonymous
-        ? 'Anonymous'
-        : userEmail.split('@')[0];
+    final displayName = isAnonymous ? 'Anonymous' : userEmail.split('@')[0];
 
     try {
       key = await sightingVm.addSighting(
@@ -286,13 +417,14 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       );
 
       // Async geo-validation after save
-      GeoValidationService.validate(latLng.latitude, latLng.longitude)
-          .then((result) {
+      GeoValidationService.validate(latLng.latitude, latLng.longitude).then((
+        result,
+      ) {
         context.read<SightingRepository>().updateGeoValidation(
-              key,
-              result.status,
-              result.message,
-            );
+          key,
+          result.status,
+          result.message,
+        );
       });
 
       if (mounted) {
@@ -318,12 +450,12 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
 
   late String key;
 
-  List<Marker> _buildMarkers(
-      List<Sighting> visible, String? currentUid) {
+  List<Marker> _buildMarkers(List<Sighting> visible, String? currentUid) {
     return visible.map((sighting) {
       final isOwner = sighting.userId == currentUid;
-      final pinColor =
-          sighting.status == SightingStatus.pending ? Colors.orange : Colors.red;
+      final pinColor = sighting.status == SightingStatus.pending
+          ? Colors.orange
+          : Colors.red;
 
       return Marker(
         point: LatLng(sighting.latitude, sighting.longitude),
@@ -332,14 +464,14 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         child: GestureDetector(
           onTap: () {
             if (!mounted) return;
+            if (_isSelectingSightingLocation) return;
             _onMarkerTapped(sighting, isOwner, currentUid);
           },
           child: Column(
             children: [
               Icon(Icons.location_on, color: pinColor, size: 40),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.white70,
                   borderRadius: BorderRadius.circular(4),
@@ -347,7 +479,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                 child: Text(
                   sighting.fishName,
                   style: const TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.bold),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -360,7 +494,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   }
 
   void _onMarkerTapped(
-      Sighting sighting, bool isOwner, String? currentUid) async {
+    Sighting sighting,
+    bool isOwner,
+    String? currentUid,
+  ) async {
     if (!mounted) return;
 
     final action = await showDialog<String>(
@@ -369,9 +506,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(sighting.fishName,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              sighting.fishName,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Text(
               sighting.status == SightingStatus.pending
@@ -393,13 +531,17 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         children: [
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'viewInfo'),
-            child: const Text('View sighting details',
-                style: TextStyle(fontSize: 16)),
+            child: const Text(
+              'View sighting details',
+              style: TextStyle(fontSize: 16),
+            ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'viewFish'),
-            child: const Text('View fish information page',
-                style: TextStyle(fontSize: 16)),
+            child: const Text(
+              'View fish information page',
+              style: TextStyle(fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -409,7 +551,8 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       if (sighting.fishId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('This sighting is not linked to a fish.')),
+            content: Text('This sighting is not linked to a fish.'),
+          ),
         );
         return;
       }
@@ -423,7 +566,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
   }
 
   void _showSightingDetails(
-      Sighting sighting, bool isOwner, String? currentUid) {
+    Sighting sighting,
+    bool isOwner,
+    String? currentUid,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -437,31 +583,42 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(sighting.fishName,
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(
+                sighting.fishName,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.person_outline,
-                      size: 16, color: Colors.grey),
+                  const Icon(
+                    Icons.person_outline,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     isOwner
                         ? 'Submitted by you'
                         : 'Submitted by ${sighting.displayName}',
                     style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                        fontStyle: FontStyle.italic),
+                      fontSize: 13,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.location_on_outlined,
-                      size: 16, color: Colors.grey),
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Near ${sighting.latitude.toStringAsFixed(2)}°, ${sighting.longitude.toStringAsFixed(2)}°',
@@ -471,8 +628,10 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               ),
               if (sighting.notes.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                const Text('Notes:',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text(
+                  'Notes:',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 4),
                 Text(sighting.notes, style: const TextStyle(fontSize: 15)),
               ],
@@ -483,19 +642,18 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   child: TextButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await _getSightingVm(context)
-                          .deleteSighting(sighting.id);
+                      await _getSightingVm(context).deleteSighting(sighting.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Sighting deleted')),
                         );
                       }
                     },
-                    icon: const Icon(Icons.delete,
-                        color: Colors.red, size: 22),
-                    label: const Text('Delete this pin',
-                        style:
-                            TextStyle(color: Colors.red, fontSize: 14)),
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                    label: const Text(
+                      'Delete this pin',
+                      style: TextStyle(color: Colors.red, fontSize: 14),
+                    ),
                   ),
                 )
               else if (sighting.status == SightingStatus.approved)
@@ -504,23 +662,25 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   child: TextButton.icon(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await _getSightingVm(context)
-                          .reportSighting(sighting.id);
+                      await _getSightingVm(context).reportSighting(sighting.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content:
-                                Text('Sighting reported to moderators.'),
+                            content: Text('Sighting reported to moderators.'),
                             backgroundColor: Colors.orange,
                           ),
                         );
                       }
                     },
-                    icon: const Icon(Icons.flag,
-                        color: Colors.orange, size: 22),
-                    label: const Text('Report inaccurate pin',
-                        style: TextStyle(
-                            color: Colors.orange, fontSize: 14)),
+                    icon: const Icon(
+                      Icons.flag,
+                      color: Colors.orange,
+                      size: 22,
+                    ),
+                    label: const Text(
+                      'Report inaccurate pin',
+                      style: TextStyle(color: Colors.orange, fontSize: 14),
+                    ),
                   ),
                 ),
             ],
@@ -548,49 +708,134 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
-      body: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: initialCenter,
-          initialZoom: 6.0,
-        ),
+      body: Stack(
         children: [
-          TileLayer(
-            urlTemplate:
-                'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.isdex',
-          ),
-          if (_userLocation != null)
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: _userLocation!,
-                  width: 60,
-                  height: 60,
-                  child: const Icon(Icons.my_location,
-                      color: Colors.blue, size: 38),
-                ),
-              ],
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: initialCenter,
+              initialZoom: 6.0,
+              onTap: (_, latLng) {
+                if (!_isSelectingSightingLocation) return;
+                setState(() => _selectedSightingLocation = latLng);
+              },
             ),
-          MarkerLayer(markers: markers),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.isdex',
+              ),
+              if (_userLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _userLocation!,
+                      width: 60,
+                      height: 60,
+                      child: const Icon(
+                        Icons.my_location,
+                        color: Colors.blue,
+                        size: 38,
+                      ),
+                    ),
+                  ],
+                ),
+              MarkerLayer(markers: markers),
+              if (_selectedSightingLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _selectedSightingLocation!,
+                      width: 70,
+                      height: 70,
+                      child: const Icon(
+                        Icons.add_location_alt,
+                        color: Colors.green,
+                        size: 46,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if (_isSelectingSightingLocation)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Material(
+                color: Colors.white,
+                elevation: 4,
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.touch_app, color: Colors.green),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Tap the map to choose sighting location',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (_isSelectingSightingLocation)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _cancelMapLocationSelection,
+                        icon: const Icon(Icons.close),
+                        label: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _selectedSightingLocation == null
+                            ? null
+                            : _confirmSelectedSightingLocation,
+                        icon: const Icon(Icons.check),
+                        label: const Text('Confirm location'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLocating ? null : _startAddSighting,
-        backgroundColor: Colors.blue,
-        icon: _isLocating
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2),
-              )
-            : const Icon(Icons.add_location_alt, color: Colors.white),
-        label: Text(
-          _isLocating ? 'Locating...' : 'Add Sighting',
-          style: const TextStyle(color: Colors.white),
-        ),
-      ),
+      floatingActionButton: _isSelectingSightingLocation
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _isLocating ? null : _startAddSighting,
+              backgroundColor: Colors.blue,
+              icon: _isLocating
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.add_location_alt, color: Colors.white),
+              label: Text(
+                _isLocating ? 'Locating...' : 'Add Sighting',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
     );
   }
 }
