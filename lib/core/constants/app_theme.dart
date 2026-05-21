@@ -8,7 +8,7 @@ class AppTheme {
   static const Color navy900 = Color(0xFF001A3E);
   static const Color navy700 = Color(0xFF002F6C);
   static const Color navy500 = Color(0xFF004A9E);
-  static const Color teal400 = Color(0xFF26C6DA);
+  static const Color teal400 = Color(0xFF42A5F5);
   static const Color teal200 = Color(0xFF80DEEA);
   static const Color teal50 = Color(0xFFE0F7FA);
   static const Color surface = Color(0xFFF5F7FB);
@@ -93,6 +93,10 @@ class AppTheme {
       unselectedItemColor: textSecondary,
       type: BottomNavigationBarType.fixed,
       elevation: 8,
+      showSelectedLabels: false,
+      showUnselectedLabels: false,
+      selectedIconTheme: const IconThemeData(size: 28),
+      unselectedIconTheme: const IconThemeData(size: 28),
     ),
     dividerTheme: DividerThemeData(
       color: navy900.withValues(alpha: 0.08),
