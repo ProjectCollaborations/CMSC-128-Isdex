@@ -208,16 +208,29 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   void _startListening() {
-    _subs.add(_watchAllSightings().listen(_onSightingsChanged,
-        onError: (e) { debugPrint('Admin stream error: $e'); }));
-    _subs.add(_watchReportedPosts().listen(_onReportedPostsChanged,
-        onError: (e) { debugPrint('Admin stream error: $e'); }));
-    _subs.add(_watchFishCatalog().listen(_onFishCatalogChanged,
-        onError: (e) { debugPrint('Admin stream error: $e'); }));
-    _subs.add(_watchArchivedFish().listen(_onArchivedFishChanged,
-        onError: (e) { debugPrint('Admin stream error: $e'); }));
-    _subs.add(_watchUsers().listen(_onUsersChanged,
-        onError: (e) { debugPrint('Admin stream error: $e'); }));
+    _subscribeWithRetry(_watchAllSightings, _onSightingsChanged);
+    _subscribeWithRetry(_watchReportedPosts, _onReportedPostsChanged);
+    _subscribeWithRetry(_watchFishCatalog, _onFishCatalogChanged);
+    _subscribeWithRetry(_watchArchivedFish, _onArchivedFishChanged);
+    _subscribeWithRetry(_watchUsers, _onUsersChanged);
+  }
+
+  void _subscribeWithRetry<T>(
+    Stream<T> Function() createStream,
+    void Function(T) onData, {
+    int attempt = 0,
+    int maxRetries = 3,
+  }) {
+    if (_disposed) return;
+    _subs.add(createStream().listen(onData, onError: (e) {
+      debugPrint('Admin stream error (attempt ${attempt + 1}/$maxRetries): $e');
+      if (attempt < maxRetries && !_disposed) {
+        Future.delayed(Duration(seconds: 1 << attempt), () {
+          _subscribeWithRetry(createStream, onData,
+              attempt: attempt + 1, maxRetries: maxRetries);
+        });
+      }
+    }));
   }
 
   void _onSightingsChanged(List<Sighting> sightings) {

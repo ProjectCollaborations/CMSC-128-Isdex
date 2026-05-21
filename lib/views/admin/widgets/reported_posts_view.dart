@@ -61,7 +61,16 @@ class ReportedPostsView extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.read<AdminViewModel>().archiveReportedPost(postId).catchError((e) {
+              context.read<AdminViewModel>().archiveReportedPost(postId).then((_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Post archived.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }).catchError((e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Archive failed: $e')),
@@ -92,7 +101,16 @@ class ReportedPostsView extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.read<AdminViewModel>().dismissReport(postId).catchError((e) {
+              context.read<AdminViewModel>().dismissReport(postId).then((_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Report dismissed.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }).catchError((e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Dismiss failed: $e')),
