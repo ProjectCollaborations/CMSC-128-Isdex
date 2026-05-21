@@ -346,7 +346,7 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,33 +359,42 @@ class _ChatScreenState extends State<ChatScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   '${_selectedModel.label} is currently unavailable. Choose another model to retry your message.',
                   style: TextStyle(
                     color: AppTheme.navy900.withValues(alpha: 0.7),
                     fontSize: 14,
-                    height: 1.35,
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 ...fallbackModels.map(
-                  (model) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.auto_awesome, color: AppTheme.teal400),
-                    title: Text(
-                      model.label,
-                      style: const TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w700,
+                  (model) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      tileColor: AppTheme.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      leading: const Icon(Icons.auto_awesome,
+                          color: AppTheme.teal400),
+                      title: Text(
+                        model.label,
+                        style: const TextStyle(
+                          color: AppTheme.navy900,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(model.description),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () => Navigator.pop(context, model),
                     ),
-                    subtitle: Text(model.description),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => Navigator.pop(context, model),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 SizedBox(
                   width: double.infinity,
                   child: TextButton(
@@ -420,18 +429,11 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: AppTheme.surface,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: const Text(
-          'Isdex AI Assistant',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        backgroundColor: Colors.transparent,
-        foregroundColor: AppTheme.navy900,
-        elevation: 0,
-        centerTitle: true,
+        title: const Text('Isdex AI Assistant'),
         actions: [
           IconButton(
             onPressed: _isAITyping ? null : _clearChat,
-            icon: const Icon(Icons.delete_sweep_outlined, color: AppTheme.navy900),
+            icon: const Icon(Icons.delete_sweep_outlined),
             tooltip: 'Clear chat',
           ),
         ],
@@ -632,10 +634,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildModelStatus() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
