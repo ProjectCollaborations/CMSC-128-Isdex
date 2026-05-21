@@ -91,9 +91,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   IconButton(
                     onPressed: () => context.go('/login'),
                     icon: const Icon(Icons.arrow_back, color: AppTheme.teal400),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.teal50,
-                    ),
                   ),
                   Expanded(
                     child: Row(
@@ -108,9 +105,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'IsDex',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             color: AppTheme.navy900,
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
@@ -124,8 +121,11 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.teal50,
-                  borderRadius: BorderRadius.circular(24),
+                  color: AppTheme.card,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Column(
@@ -142,21 +142,23 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
+                    Text(
                       'Name',
-                      style: TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
                     _FormField(hint: 'Enter username', controller: _nameController),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Email',
-                      style: TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -166,21 +168,23 @@ class _SignupScreenState extends State<SignupScreen> {
                       controller: _emailController,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Password',
-                      style: TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
                     _FormField(hint: 'Enter password', obscure: true, controller: _passwordController),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Enter Password Again',
-                      style: TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -238,6 +242,14 @@ class _FormField extends StatelessWidget {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hint,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.navy500.withValues(alpha: 0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppTheme.teal400, width: 2),
+        ),
       ),
     );
   }

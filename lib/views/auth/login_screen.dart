@@ -107,9 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   IconButton(
                     onPressed: () => context.go('/'),
                     icon: const Icon(Icons.arrow_back, color: AppTheme.teal400),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.teal50,
-                    ),
                   ),
                   Expanded(
                     child: Row(
@@ -124,9 +121,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'IsDex',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             color: AppTheme.navy900,
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
@@ -140,8 +137,11 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.teal50,
-                  borderRadius: BorderRadius.circular(24),
+                  color: AppTheme.card,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Column(
@@ -158,35 +158,53 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
+                    Text(
                       'Email',
-                      style: TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Enter email',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppTheme.navy500.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppTheme.teal400, width: 2),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Password',
-                      style: TextStyle(
-                        color: AppTheme.navy900,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Enter password',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppTheme.navy500.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppTheme.teal400, width: 2),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
