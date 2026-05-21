@@ -572,18 +572,20 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
           MarkerLayer(markers: markers),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLocating ? null : _startAddSighting,
-        icon: _isLocating
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2),
-              )
-            : const Icon(Icons.add_location_alt, color: Colors.white),
-        label: Text(_isLocating ? 'Locating...' : 'Add Sighting'),
-      ),
+      floatingActionButton: authVm.isLoggedIn
+          ? FloatingActionButton.extended(
+              onPressed: _isLocating ? null : _startAddSighting,
+              icon: _isLocating
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add_location_alt, color: Colors.white),
+              label: Text(_isLocating ? 'Locating...' : 'Add Sighting'),
+            )
+          : null,
     );
   }
 }

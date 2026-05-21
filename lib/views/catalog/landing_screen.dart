@@ -137,9 +137,8 @@ class _LandingScreenState extends State<LandingScreen> {
           const BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
           const BottomNavigationBarItem(
               icon: Icon(Icons.location_on), label: 'Sightings'),
-          if (authVm.isLoggedIn)
-            const BottomNavigationBarItem(
-                icon: Icon(Icons.auto_awesome), label: 'AI'),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.auto_awesome), label: 'AI'),
           if (authVm.userRole == 'admin' || authVm.userRole == 'mod')
             const BottomNavigationBarItem(
                 icon: Icon(Icons.admin_panel_settings), label: 'Admin'),
@@ -153,9 +152,7 @@ class _LandingScreenState extends State<LandingScreen> {
           }
           actions.add(() => context.push('/map'));
           actions.add(() => context.push('/sighting'));
-          if (authVm.isLoggedIn) {
-            actions.add(() => context.push('/chat'));
-          }
+          actions.add(() => context.push('/chat'));
           if (authVm.userRole == 'admin' || authVm.userRole == 'mod') {
             actions.add(() => context.go('/admin'));
           }
