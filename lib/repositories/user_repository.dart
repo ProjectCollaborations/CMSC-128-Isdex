@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/app_user.dart';
 import '../core/constants/firebase_nodes.dart';
@@ -20,5 +21,19 @@ class UserRepository {
   Future<bool> isEmailRegistered(String email) async {
     final snap = await _db.child(FirebaseNodes.emailKey(email)).get();
     return snap.exists && snap.value != null;
+  }
+
+  Stream<List<AppUser>> watchAll() {
+    return _db.child(FirebaseNodes.users).onValue.map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) return <AppUser>[];
+      final map = event.snapshot.value as Map<dynamic, dynamic>;
+      return map.entries
+          .map((e) => AppUser.fromMap(
+                e.key.toString(),
+                Map<dynamic, dynamic>.from(e.value as Map),
+              ))
+          .toList()
+            ..sort((a, b) => a.role.compareTo(b.role));
+    });
   }
 }

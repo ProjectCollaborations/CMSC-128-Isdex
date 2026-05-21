@@ -55,6 +55,15 @@ class _LandingScreenState extends State<LandingScreen> {
                 subtitle: const Text('Logged in'),
               ),
               const Divider(),
+              if (authVm.userRole == 'admin' || authVm.userRole == 'mod')
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
+                  title: const Text('Admin Panel'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/admin');
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text('Sign Out'),
@@ -291,6 +300,18 @@ class _LandingScreenState extends State<LandingScreen> {
                 size: 28,
               ),
               tooltip: 'AI Assistant',
+            ),
+          if (authVm.userRole == 'admin' || authVm.userRole == 'mod')
+            IconButton(
+              onPressed: () {
+                context.go('/admin');
+              },
+              icon: const Icon(
+                Icons.admin_panel_settings,
+                color: Colors.blue,
+                size: 28,
+              ),
+              tooltip: 'Admin Panel',
             ),
         ],
       ),
