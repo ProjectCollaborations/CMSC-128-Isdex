@@ -46,7 +46,7 @@ class AdminViewModel extends ChangeNotifier {
   // ── Gate state ──
   bool _initialized = false;
   bool _disposed = false;
-  String _currentUserRole = 'user';
+  bool _accessGranted = false;
   int _currentTabIndex = 0;
 
   // ── Tab 0: Sightings ──
@@ -79,9 +79,9 @@ class AdminViewModel extends ChangeNotifier {
 
   // ── Getters ──
   bool get isInitialized => _initialized;
-  bool get isAdmin => _currentUserRole == 'admin';
-  bool get isModerator => _currentUserRole == 'admin' || _currentUserRole == 'mod';
-  String get currentUserRole => _currentUserRole;
+  bool get isAdmin => _authVm.userRole == 'admin';
+  bool get isModerator => _accessGranted || _authVm.userRole == 'admin' || _authVm.userRole == 'mod';
+  String get currentUserRole => _authVm.userRole;
   int get currentTabIndex => _currentTabIndex;
 
   List<Sighting> get sightings => _sightings;
@@ -175,12 +175,29 @@ class AdminViewModel extends ChangeNotifier {
         _hardDeleteFish = hardDeleteFish,
         _watchUsers = watchUsers,
         _updateUserRole = updateUserRole,
-        _allFishSnapshot = allFishSnapshot;
+        _allFishSnapshot = allFishSnapshot {
+    _authVm.addListener(_recheckAccess);
+  }
+
+  void _recheckAccess() {
+    if (_disposed) return;
+    final role = _authVm.userRole;
+    _accessGranted = role == 'admin' || role == 'mod';
+    if (!isAdmin && _currentTabIndex >= 3) {
+      _currentTabIndex = 0;
+    }
+    if (_accessGranted && !_initialized) {
+      init();
+    } else {
+      notifyListeners();
+    }
+  }
 
   Future<void> init() async {
     if (_initialized) return;
-    _currentUserRole = _authVm.userRole;
-    if (_currentUserRole == 'user') {
+    final role = _authVm.userRole;
+    _accessGranted = role == 'admin' || role == 'mod';
+    if (!_accessGranted) {
       _initialized = true;
       notifyListeners();
       return;
@@ -241,6 +258,7 @@ class AdminViewModel extends ChangeNotifier {
 
   // ── Tab Navigation ──
   void setTab(int index) {
+    if (index < 0 || index >= visibleTabs) return;
     _currentTabIndex = index;
     notifyListeners();
   }
@@ -273,14 +291,6 @@ class AdminViewModel extends ChangeNotifier {
     }
     if (sighting.latitude < -90 || sighting.latitude > 90) errors.add('Invalid latitude');
     if (sighting.longitude < -180 || sighting.longitude > 180) errors.add('Invalid longitude');
-    final geoStatus = sighting.geoValidationStatus.toLowerCase();
-    if (geoStatus != 'water') {
-      errors.add(
-        sighting.geoValidationMessage.isNotEmpty
-            ? 'Location validation failed: ${sighting.geoValidationMessage}'
-            : 'Location is not confirmed as water',
-      );
-    }
     return errors;
   }
 

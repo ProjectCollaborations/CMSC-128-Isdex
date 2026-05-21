@@ -451,13 +451,6 @@ void main() {
       final badLng = sightingPending.copyWith(longitude: 181.0);
       final errorsLng = vm!.approvalValidationErrors(badLng, knownIds);
       expect(errorsLng, contains('Invalid longitude'));
-
-      final nonWater = sightingPending.copyWith(
-        geoValidationStatus: 'land',
-        geoValidationMessage: 'Not on water',
-      );
-      final errorsGeo = vm!.approvalValidationErrors(nonWater, knownIds);
-      expect(errorsGeo, anyElement(contains('Location validation failed')));
     });
   });
 

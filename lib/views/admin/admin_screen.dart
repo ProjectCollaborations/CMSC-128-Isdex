@@ -17,14 +17,6 @@ class AdminScreen extends StatefulWidget {
 
 class _AdminScreenState extends State<AdminScreen> {
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdminViewModel>().init();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     final vm = context.watch<AdminViewModel>();
 

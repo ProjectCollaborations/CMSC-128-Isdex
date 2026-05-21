@@ -212,7 +212,17 @@ class FishManagementView extends StatelessWidget {
               Navigator.pop(ctx);
               context
                   .read<AdminViewModel>()
-                  .hardDeleteFish(id, fromArchive: fromArchive);
+                  .hardDeleteFish(id, fromArchive: fromArchive)
+                  .catchError((e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Delete failed: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              });
             },
             child: const Text('Delete Forever',
                 style: TextStyle(color: Colors.red)),

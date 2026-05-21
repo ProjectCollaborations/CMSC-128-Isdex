@@ -37,12 +37,6 @@ GoRouter createRouter(AuthViewModel authVm) {
       if (!loggedIn && !onAuthRoute) return '/login';
       if (loggedIn && onAuthRoute) return '/';
 
-      final onAdmin = state.matchedLocation == '/admin';
-      if (onAdmin) {
-        final role = context.read<AuthViewModel>().userRole;
-        if (role != 'admin' && role != 'mod') return '/';
-      }
-
       return null;
     },
     routes: [

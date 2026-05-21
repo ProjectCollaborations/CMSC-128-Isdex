@@ -72,7 +72,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onDelete;
-  final VoidCallback onReport;
+  final Future<void> Function() onReport;
 
   const _PostCard({
     required this.post,
@@ -189,15 +189,28 @@ class _PostCard extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.flag, color: Colors.orange),
                 title: const Text('Report inappropriate post'),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  onReport();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Post reported to moderators.'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
+                  try {
+                    await onReport();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Post reported to moderators.'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to report post. Please try again.'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 },
               ),
           ],
