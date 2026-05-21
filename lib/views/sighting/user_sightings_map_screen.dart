@@ -270,6 +270,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     _SightingLocationMode locationMode,
   ) async {
     final sightingVm = _getSightingVm(context);
+    final messenger = ScaffoldMessenger.of(context);
     String? selectedFishId;
     String? selectedFishName;
     final notesController = TextEditingController();
@@ -458,7 +459,8 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
             ElevatedButton(
               onPressed: () {
                 if (selectedFishId == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
                     const SnackBar(content: Text('Please select a fish first.')),
                   );
                   return;
