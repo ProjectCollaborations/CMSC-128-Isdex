@@ -40,7 +40,7 @@ class AdminViewModel extends ChangeNotifier {
   final HardDeleteFishFn _hardDeleteFish;
   final WatchUsersFn _watchUsers;
   final UpdateUserRoleFn _updateUserRole;
-  // ignore: unused_field
+  // ignore: unused_field — available for snapshot-based validation when needed
   final AllFishSnapshotFn _allFishSnapshot;
 
   // ── Gate state ──
@@ -172,6 +172,7 @@ class AdminViewModel extends ChangeNotifier {
         _allFishSnapshot = allFishSnapshot;
 
   Future<void> init() async {
+    if (_initialized) return;
     _currentUserRole = _authVm.userRole;
     if (_currentUserRole == 'user') {
       _initialized = true;
@@ -283,10 +284,7 @@ class AdminViewModel extends ChangeNotifier {
       final knownFishIds = _fishCatalog.map((f) => f.id).toSet();
 
       for (final id in _selectedIds) {
-        final sighting = _sightings.cast<Sighting?>().firstWhere(
-          (s) => s?.id == id,
-          orElse: () => null,
-        );
+        final sighting = _sightings.where((s) => s.id == id).firstOrNull;
         if (sighting == null) continue;
 
         final errors = approvalValidationErrors(sighting, knownFishIds);
@@ -316,24 +314,59 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   Future<void> approveSighting(String id) async {
-    await _updateSightingStatus(id, SightingStatus.approved);
+    _isProcessing = true;
+    notifyListeners();
+    try {
+      await _updateSightingStatus(id, SightingStatus.approved);
+    } finally {
+      _isProcessing = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> archiveSighting(String id) async {
-    await _updateSightingStatus(id, SightingStatus.rejected);
+    _isProcessing = true;
+    notifyListeners();
+    try {
+      await _updateSightingStatus(id, SightingStatus.rejected);
+    } finally {
+      _isProcessing = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> deleteSighting(String id) async {
-    await _deleteSighting(id);
+    _isProcessing = true;
+    notifyListeners();
+    try {
+      await _deleteSighting(id);
+    } finally {
+      _isProcessing = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   // ── Reports ──
   Future<void> dismissReport(String postId) async {
-    await _dismissReport(postId);
+    _isProcessing = true;
+    notifyListeners();
+    try {
+      await _dismissReport(postId);
+    } finally {
+      _isProcessing = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> archiveReportedPost(String postId) async {
-    await _archivePost(postId);
+    _isProcessing = true;
+    notifyListeners();
+    try {
+      await _archivePost(postId);
+    } finally {
+      _isProcessing = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   // ── Fish ──
@@ -399,7 +432,7 @@ class AdminViewModel extends ChangeNotifier {
       await _hardDeleteFish(id, fromArchive: fromArchive);
     } finally {
       _fishProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
