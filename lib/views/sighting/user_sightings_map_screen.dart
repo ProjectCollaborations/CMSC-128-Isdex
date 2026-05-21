@@ -824,18 +824,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   markers: [
                     Marker(
                       point: _selectedSightingLocation!,
-                      width: 40,
-                      height: 40,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.green.withValues(alpha: 0.15),
-                          border: Border.all(color: Colors.green, width: 2.5),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.circle, size: 8, color: Colors.green),
-                        ),
-                      ),
+                      width: 28,
+                      height: 28,
+                      child: const Icon(Icons.location_on, size: 28, color: Colors.green),
                     ),
                   ],
                 ),
