@@ -810,22 +810,17 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   markers: [
                     Marker(
                       point: _selectedSightingLocation!,
-                      width: 70,
-                      height: 70,
-                      child: const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_location_alt,
-                              color: Colors.green, size: 46),
-                          Text(
-                            'Selected',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.green.withValues(alpha: 0.15),
+                          border: Border.all(color: Colors.green, width: 2.5),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.circle, size: 8, color: Colors.green),
+                        ),
                       ),
                     ),
                   ],
@@ -867,20 +862,26 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _cancelMapLocationSelection,
-                        icon: const Icon(Icons.close),
-                        label: const Text('Cancel'),
+                      child: SizedBox(
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: _cancelMapLocationSelection,
+                          icon: const Icon(Icons.close, size: 20),
+                          label: const Text('Cancel'),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _selectedSightingLocation == null
-                            ? null
-                            : _confirmSelectedSightingLocation,
-                        icon: const Icon(Icons.check),
-                        label: const Text('Confirm location'),
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _selectedSightingLocation == null
+                              ? null
+                              : _confirmSelectedSightingLocation,
+                          icon: const Icon(Icons.check, size: 20),
+                          label: const Text('Confirm'),
+                        ),
                       ),
                     ),
                   ],
