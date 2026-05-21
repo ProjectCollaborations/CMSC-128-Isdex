@@ -1,8 +1,17 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/community_post.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
+
+Uint8List? _tryDecodeBase64(String data) {
+  try {
+    return base64Decode(data);
+  } catch (_) {
+    return null;
+  }
+}
 
 class ReportedPostsView extends StatelessWidget {
   const ReportedPostsView({super.key});
@@ -10,6 +19,10 @@ class ReportedPostsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<AdminViewModel>();
+
+    if (vm.sightingsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     if (vm.reportedPosts.isEmpty) {
       return const Center(
@@ -87,17 +100,7 @@ class _ReportedPostCard extends StatelessWidget {
             ],
             if (post.imageBase64.isNotEmpty) ...[
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(
-                  base64Decode(post.imageBase64),
-                  height: 180,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.broken_image, size: 48),
-                ),
-              ),
+              _buildImageConditional(post.imageBase64),
             ],
             const SizedBox(height: 12),
             Row(
@@ -127,6 +130,22 @@ class _ReportedPostCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildImageConditional(String imageBase64) {
+    final bytes = _tryDecodeBase64(imageBase64);
+    if (bytes == null) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.memory(
+        bytes,
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.broken_image, size: 48),
       ),
     );
   }

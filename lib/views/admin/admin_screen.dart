@@ -84,10 +84,10 @@ class _AdminScreenState extends State<AdminScreen> {
             icon: Icon(Icons.flag),
             label: 'Reports',
           ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_nature),
-              label: 'Fish',
-            ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.emoji_nature),
+            label: 'Fish',
+          ),
           if (vm.visibleTabs > 3)
             const BottomNavigationBarItem(
               icon: Icon(Icons.people),

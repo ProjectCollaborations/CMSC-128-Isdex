@@ -108,13 +108,20 @@ class _FishFormDialogState extends State<FishFormDialog> {
       distribution: _distributionCtrl.text.trim(),
     );
 
-    if (_isEditing) {
-      await vm.updateFish(fish);
-    } else {
-      await vm.addFish(fish);
+    try {
+      if (_isEditing) {
+        await vm.updateFish(fish);
+      } else {
+        await vm.addFish(fish);
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
