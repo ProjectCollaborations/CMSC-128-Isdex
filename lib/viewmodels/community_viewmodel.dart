@@ -6,13 +6,14 @@ import 'auth_viewmodel.dart';
 
 typedef PostsStreamFactory = Stream<List<CommunityPost>> Function();
 typedef CommentsStreamFactory = Stream<List<Comment>> Function(String postId);
-typedef AddPostFn = Future<void> Function({
-  required String uid,
-  required String username,
-  required String caption,
-  required String imageBase64,
-});
-typedef ToggleLikeFn = Future<void> Function(String postId, String uid);
+typedef AddPostFn =
+    Future<void> Function({
+      required String uid,
+      required String username,
+      required String caption,
+      required String imageBase64,
+    });
+typedef ToggleLikeFn = Future<bool> Function(String postId, String uid);
 typedef IsLikedByFn = Future<bool> Function(String postId, String uid);
 typedef ReportPostFn = Future<void> Function(String postId);
 typedef DeletePostFn = Future<void> Function(String postId);
@@ -35,6 +36,9 @@ class CommunityViewModel extends ChangeNotifier {
   final Map<String, int> _commentCounts = {};
   Set<String> _likedPostIds = {};
   bool _isLoading = true;
+  String? _activeUserId;
+  int _likedStateRequestId = 0;
+  bool _isDisposed = false;
 
   // ──────────────────────────────────────────────────────────────
   // Race condition fix #1: Generation counter with stale detection
@@ -216,7 +220,7 @@ class CommunityViewModel extends ChangeNotifier {
     for (final id in neededIds.difference(currentIds)) {
       _commentSubs[id] = _watchComments(id).listen((comments) {
         _commentCounts[id] = comments.length;
-        notifyListeners();
+        _notifyIfActive();
       });
     }
   }
