@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
@@ -53,7 +54,7 @@ class _SignupScreenState extends State<SignupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Account created successfully!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.success,
         ),
       );
     }
@@ -61,7 +62,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.error),
     );
   }
 
@@ -79,159 +80,130 @@ class _SignupScreenState extends State<SignupScreen> {
     final authVm = context.watch<AuthViewModel>();
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
               const SizedBox(height: 24),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                child: Column(
-                  children: [
-                    Row(
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => context.go('/login'),
+                    icon: const Icon(Icons.arrow_back, color: AppTheme.teal400),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.teal50,
+                    ),
+                  ),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        IconButton(
-                          onPressed: () => context.go('/login'),
-                          icon: const Icon(Icons.arrow_back, color: Colors.blue),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.blue[50],
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/images/isdex_logo.png',
+                            height: 40,
+                            width: 40,
                           ),
                         ),
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: AppTheme.background,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                padding: const EdgeInsets.all(8),
-                                child: Image.asset(
-                                  'assets/images/isdex_logo.png',
-                                  height: 40,
-                                  width: 40,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'IsDex',
-                                style: TextStyle(
-                                  color: AppTheme.darkNavy,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 8),
+                        const Text(
+                          'IsDex',
+                          style: TextStyle(
+                            color: AppTheme.navy900,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.lightBlue,
-                        borderRadius: BorderRadius.circular(24),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.teal50,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Text(
+                        'Sign Up',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.navy900,
+                        ),
                       ),
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Center(
-                            child: Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.darkNavy,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'Name',
-                            style: TextStyle(
-                              color: AppTheme.darkNavy,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _FormField(hint: 'Enter username', controller: _nameController),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Email',
-                            style: TextStyle(
-                              color: AppTheme.darkNavy,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _FormField(
-                            hint: 'Enter email',
-                            keyboardType: TextInputType.emailAddress,
-                            controller: _emailController,
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Password',
-                            style: TextStyle(
-                              color: AppTheme.darkNavy,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _FormField(hint: 'Enter password', obscure: true, controller: _passwordController),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Enter Password Again',
-                            style: TextStyle(
-                              color: AppTheme.darkNavy,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _FormField(
-                            hint: 'Re-enter password to confirm',
-                            obscure: true,
-                            controller: _confirmPasswordController,
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: authVm.isLoading ? null : _handleSignUp,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.accentBlue,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Name',
+                      style: TextStyle(
+                        color: AppTheme.navy900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _FormField(hint: 'Enter username', controller: _nameController),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Email',
+                      style: TextStyle(
+                        color: AppTheme.navy900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _FormField(
+                      hint: 'Enter email',
+                      keyboardType: TextInputType.emailAddress,
+                      controller: _emailController,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Password',
+                      style: TextStyle(
+                        color: AppTheme.navy900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _FormField(hint: 'Enter password', obscure: true, controller: _passwordController),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Enter Password Again',
+                      style: TextStyle(
+                        color: AppTheme.navy900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _FormField(
+                      hint: 'Re-enter password to confirm',
+                      obscure: true,
+                      controller: _confirmPasswordController,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: authVm.isLoading ? null : _handleSignUp,
+                        child: authVm.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.teal400,
+                                  strokeWidth: 2,
                                 ),
-                              ),
-                              child: authVm.isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        color: AppTheme.darkNavy,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Welcome Diver!',
-                                      style: TextStyle(
-                                        color: AppTheme.darkNavy,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ],
+                              )
+                            : const Text('Welcome Diver!'),
                       ),
                     ),
                   ],
@@ -265,13 +237,7 @@ class _FormField extends StatelessWidget {
       obscureText: obscure,
       keyboardType: keyboardType,
       decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.white,
         hintText: hint,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
       ),
     );
   }
