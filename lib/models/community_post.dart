@@ -72,8 +72,13 @@ class CommunityPost {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is CommunityPost && id == other.id;
+      identical(this, other) ||
+      other is CommunityPost &&
+          id == other.id &&
+          likes == other.likes &&
+          isReported == other.isReported &&
+          status == other.status;
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => Object.hash(id, likes, isReported, status);
 }

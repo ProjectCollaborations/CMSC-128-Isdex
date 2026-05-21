@@ -6,10 +6,38 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../viewmodels/community_viewmodel.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/community_post.dart';
 
-class CommunityScreen extends StatelessWidget {
+class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
+
+  @override
+  State<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends State<CommunityScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthViewModel>().addListener(_onAuthChanged);
+    });
+  }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    context.read<CommunityViewModel>().refreshLikedState();
+  }
+
+  @override
+  void dispose() {
+    try {
+      context.read<AuthViewModel>().removeListener(_onAuthChanged);
+    } catch (_) {}
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +64,7 @@ class CommunityScreen extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final post = vm.posts[index];
                       return _PostCard(
+                        key: ValueKey('${post.id}_${post.likes}'),
                         post: post,
                         isLiked: vm.likedPostIds.contains(post.id),
                         commentCount: vm.commentCounts[post.id] ?? 0,
@@ -75,6 +104,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onReport;
 
   const _PostCard({
+    super.key,
     required this.post,
     required this.isLiked,
     required this.commentCount,
