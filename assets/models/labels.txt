@@ -1,50 +1,40 @@
-Yellowfin Tuna
-Gray Snapper
+Asian Seabass
+Barracuda
+Boxfish
+Butterflyfish
+Common Carp
+Damselfish
+Dolphinfish
+Eel
+Emperor
+Flying Fish
+Goatfish
 Goldstripe Sardinella
+Gray Snapper
+Grouper
+Halfbeak
+Jack
+Leopard Coral Grouper
 Long-jawed Mackerel
 Mackerel Scad
-Threadfin Bream
-Leopard Coral Grouper
-Nile Tilapia
-Milkfish
-Striped Snakehead
-Common Carp
-Asian Catfish
 Manila Catfish
-White Goby
-Silver Perch
-Giant Gourami
-Mudfish
-Climbing Perch
-Trevally
-Grouper
-Red Snapper
-Goatfish
-Emperor
-Indo-Pacific Tarpon
-Dolphinfish
-Threadfin Salmon
-Red Bigeye
 Moonfish
-Rabbit Fish
-Surgeonfish
-Butterflyfish
-Damselfish
-Wrasse
-Parrotfish
-Sweetlip
-Barracuda
-Jack
-Asian Seabass
-Eel
-Halfbeak
 Needlefish
-Flying Fish
-Seahorse
-Sea Dragon
-Pufferfish
-Porcupinefish
-Boxfish
+Parrotfish
 Pomfret
+Porcupinefish
+Pufferfish
+Rabbit Fish
+Red Bigeye
+Red Snapper
 Ribbonfish
+Sea Dragon
+Seahorse
 Spotted Scat
+Surgeonfish
+Sweetlip
+Threadfin Bream
+Threadfin Salmon
+Trevally
+Wrasse
+Yellowfin Tuna

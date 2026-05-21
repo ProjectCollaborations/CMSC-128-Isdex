@@ -57,4 +57,5 @@ flutter:
     - assets/images/fish/
     - assets/models/fish_model.tflite
     - assets/models/1.tflite
-    - assets/models/labels.txt
+    - assets/models/model (1).tflite
+    - assets/models/labels (1).txt

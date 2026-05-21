@@ -1,844 +1,701 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:tflite_plus/tflite_plus.dart';
+import 'package:image/image.dart' as img;
+import '../../models/fish.dart';
 
-class DatabaseInitService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+class FishImageSearchScreen extends StatefulWidget {
+  final List<Fish> allSpecies;
+  const FishImageSearchScreen({super.key, required this.allSpecies});
 
-  // Initialize Fish - 50 Philippine Fish
-  Future<void> initializeFish() async {
+  @override
+  State<FishImageSearchScreen> createState() => _FishImageSearchScreenState();
+}
+
+class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
+  File? _imageFile;
+  List<Fish> _matchedFish = [];
+  List<String> _detectedLabels = [];
+  bool _isLoading = false;
+  bool _isModelReady = false;
+  String _statusMessage = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  Interpreter? _interpreter;
+  List<String> _classLabels = [];
+  static const int _inputSize = 224;
+  int _outputSize = 0; // will be set after model loads
+
+  // Mapping from label keywords to fish common names (same as before)
+  final Map<String, List<String>> _keywordToFish = {
+    'tuna': ['Yellowfin Tuna'],
+    'yellowfin': ['Yellowfin Tuna'],
+    'snapper': ['Red Snapper', 'Gray Snapper'],
+    'red snapper': ['Red Snapper'],
+    'gray snapper': ['Gray Snapper'],
+    'grouper': ['Leopard Coral Grouper', 'Grouper'],
+    'leopard coral grouper': ['Leopard Coral Grouper'],
+    'mackerel': ['Long-jawed Mackerel', 'Mackerel Scad'],
+    'long-jawed mackerel': ['Long-jawed Mackerel'],
+    'scad': ['Mackerel Scad'],
+    'carp': ['Common Carp'],
+    'common carp': ['Common Carp'],
+    'catfish': ['Manila Catfish'],
+    'manila catfish': ['Manila Catfish'],
+    'barracuda': ['Barracuda'],
+    'butterflyfish': ['Butterflyfish'],
+    'eel': ['Eel'],
+    'parrotfish': ['Parrotfish'],
+    'surgeonfish': ['Surgeonfish'],
+    'pufferfish': ['Pufferfish'],
+    'puffer': ['Pufferfish'],
+    'porcupinefish': ['Porcupinefish'],
+    'boxfish': ['Boxfish'],
+    'seahorse': ['Seahorse'],
+    'sea dragon': ['Sea Dragon'],
+    'seadragon': ['Sea Dragon'],
+    'jack': ['Jack', 'Trevally'],
+    'trevally': ['Trevally'],
+    'seabass': ['Asian Seabass'],
+    'asian seabass': ['Asian Seabass'],
+    'barramundi': ['Asian Seabass'],
+    'bream': ['Threadfin Bream'],
+    'emperor': ['Emperor'],
+    'goatfish': ['Goatfish'],
+    'rabbitfish': ['Rabbit Fish'],
+    'moonfish': ['Moonfish'],
+    'ribbonfish': ['Ribbonfish'],
+    'pomfret': ['Pomfret'],
+    'dolphinfish': ['Dolphinfish'],
+    'salmon': ['Threadfin Salmon'],
+    'bigeye': ['Red Bigeye'],
+    'scat': ['Spotted Scat'],
+    'halfbeak': ['Halfbeak'],
+    'needlefish': ['Needlefish'],
+    'flying fish': ['Flying Fish'],
+    'flyingfish': ['Flying Fish'],
+    'wrasse': ['Wrasse'],
+    'sweetlip': ['Sweetlip'],
+    'damselfish': ['Damselfish'],
+    'sardinella': ['Goldstripe Sardinella'],
+    'goldstripe sardinella': ['Goldstripe Sardinella'],
+    'sardine': ['Goldstripe Sardinella'],
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadModel();
+  }
+
+  // --------------------------------------------------------------
+  // Load model and read output size dynamically
+  // --------------------------------------------------------------
+  Future<void> _loadModel() async {
+    setState(() => _isLoading = true);
     try {
-      List<Map<String, dynamic>> fishData = [
-        {
-          'fishId': 'fish_1',
-          'commonName': 'Yellowfin Tuna',
-          'scientificName': 'Thunnus albacares',
-          'localName': 'Tambakol',
-          'habitat': 'Saltwater',
-          'sizeRange': '100–150 cm',
-          'identifyingFeatures': [
-            'Blue to dark back with yellow sides',
-            'Long yellow dorsal and anal fins',
-          ],
-          'imageUrl': 'assets/images/fish/fish (1).png',
-        },
-        {
-          'fishId': 'fish_2',
-          'commonName': 'Gray Snapper',
-          'scientificName': 'Lutjanus griseus',
-          'localName': 'Maya-maya',
-          'habitat': 'Saltwater',
-          'sizeRange': '25–40 cm',
-          'identifyingFeatures': [
-            'Gray to olive body coloration',
-            'Dark stripe through eye',
-          ],
-          'imageUrl': 'assets/images/fish/fish (2).png',
-        },
-        {
-          'fishId': 'fish_3',
-          'commonName': 'Goldstripe Sardinella',
-          'scientificName': 'Hyperlophus vittatus',
-          'localName': 'Sardinella',
-          'habitat': 'Saltwater',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Silver body with distinctive gold stripe',
-            'Small, streamlined body shape',
-          ],
-          'imageUrl': 'assets/images/fish/fish (3).png',
-        },
-        {
-          'fishId': 'fish_4',
-          'commonName': 'Long-jawed Mackerel',
-          'scientificName': 'Rastrelliger kanagurta',
-          'localName': 'Alumahan',
-          'habitat': 'Saltwater',
-          'sizeRange': '30–35 cm',
-          'identifyingFeatures': [
-            'Blue-green back with silver belly',
-            'Wavy dark lines on upper body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (4).png',
-        },
-        {
-          'fishId': 'fish_5',
-          'commonName': 'Mackerel Scad',
-          'scientificName': 'Decapterus sp',
-          'localName': 'Galunggong',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–25 cm',
-          'identifyingFeatures': [
-            'Silver body with forked tail',
-            'Small dark spot on gill cover',
-          ],
-          'imageUrl': 'assets/images/fish/fish (5).png',
-        },
-        {
-          'fishId': 'fish_6',
-          'commonName': 'Threadfin Bream',
-          'scientificName': 'Nemipterus japonicus',
-          'localName': 'Bisugo',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–25 cm',
-          'identifyingFeatures': [
-            'Pink to red body coloration',
-            'Elongated pectoral fin filament',
-          ],
-          'imageUrl': 'assets/images/fish/fish (6).png',
-        },
-        {
-          'fishId': 'fish_7',
-          'commonName': 'Leopard Coral Grouper',
-          'scientificName': 'Epinephelus sp',
-          'localName': 'Lapu-lapu',
-          'habitat': 'Saltwater',
-          'sizeRange': '40–60 cm',
-          'identifyingFeatures': [
-            'Orange-red body with white streaks or spots',
-            'Large mouth and robust body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (7).png',
-        },
-        {
-          'fishId': 'fish_8',
-          'commonName': 'Nile Tilapia',
-          'scientificName': 'Oreochromis niloticus',
-          'localName': 'Tilapia',
-          'habitat': 'Freshwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Golden to olive-gray coloration',
-            'Vertical bars on body (may fade)',
-          ],
-          'imageUrl': 'assets/images/fish/fish (8).png',
-        },
-        {
-          'fishId': 'fish_9',
-          'commonName': 'Milkfish',
-          'scientificName': 'Chanos chanos',
-          'localName': 'Bangus',
-          'habitat': 'Saltwater/Freshwater',
-          'sizeRange': '30–40 cm',
-          'identifyingFeatures': [
-            'Silvery streamlined body',
-            'Deeply forked tail fin',
-          ],
-          'imageUrl': 'assets/images/fish/fish (9).png',
-        },
-        {
-          'fishId': 'fish_10',
-          'commonName': 'Striped Snakehead',
-          'scientificName': 'Channa striata',
-          'localName': 'Dalag',
-          'habitat': 'Freshwater',
-          'sizeRange': '30–45 cm',
-          'identifyingFeatures': [
-            'Dark body with chevron-like stripes',
-            'Large head with snake-like appearance',
-          ],
-          'imageUrl': 'assets/images/fish/fish (10).png',
-        },
-        {
-          'fishId': 'fish_11',
-          'commonName': 'Common Carp',
-          'scientificName': 'Cyprinus carpio',
-          'localName': 'Carp',
-          'habitat': 'Freshwater',
-          'sizeRange': '40–60 cm',
-          'identifyingFeatures': [
-            'Brown to golden coloring',
-            'Two pairs of barbels on mouth',
-          ],
-          'imageUrl': 'assets/images/fish/fish (11).png',
-        },
-        {
-          'fishId': 'fish_12',
-          'commonName': 'Asian Catfish',
-          'scientificName': 'Clarias batrachus',
-          'localName': 'Catfish',
-          'habitat': 'Freshwater',
-          'sizeRange': '25–35 cm',
-          'identifyingFeatures': [
-            'Dark gray to black body',
-            'Four pairs of barbels (whiskers)',
-          ],
-          'imageUrl': 'assets/images/fish/fish (12).png',
-        },
-        {
-          'fishId': 'fish_13',
-          'commonName': 'Manila Catfish',
-          'scientificName': 'Arius manillensis',
-          'localName': 'Kanduli',
-          'habitat': 'Freshwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Dark body coloration',
-            'Large sharp pectoral spines',
-          ],
-          'imageUrl': 'assets/images/fish/fish (13).png',
-        },
-        {
-          'fishId': 'fish_14',
-          'commonName': 'White Goby',
-          'scientificName': 'Glossogobius giuris',
-          'localName': 'Puting biya',
-          'habitat': 'Freshwater',
-          'sizeRange': '10–15 cm',
-          'identifyingFeatures': [
-            'White to pale gray body',
-            'Two separate dorsal fins',
-          ],
-          'imageUrl': 'assets/images/fish/fish (14).png',
-        },
-        {
-          'fishId': 'fish_15',
-          'commonName': 'Silver Perch',
-          'scientificName': 'Leiopotherapon plumbeus',
-          'localName': 'Ayuñgin',
-          'habitat': 'Freshwater',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Silver body with dark longitudinal stripes',
-            'Compressed body shape',
-          ],
-          'imageUrl': 'assets/images/fish/fish (15).png',
-        },
-        {
-          'fishId': 'fish_16',
-          'commonName': 'Giant Gourami',
-          'scientificName': 'Osphronemus goramy',
-          'localName': 'Gourami',
-          'habitat': 'Freshwater',
-          'sizeRange': '50–60 cm',
-          'identifyingFeatures': [
-            'Large, robust body',
-            'Thick lips and compressed body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (16).png',
-        },
-        {
-          'fishId': 'fish_17',
-          'commonName': 'Mudfish',
-          'scientificName': 'Oxyeleotris marmoratus',
-          'localName': 'Mudfish',
-          'habitat': 'Freshwater',
-          'sizeRange': '30–40 cm',
-          'identifyingFeatures': [
-            'Dark mottled or marbled pattern',
-            'Elongated body shape',
-          ],
-          'imageUrl': 'assets/images/fish/fish (17).png',
-        },
-        {
-          'fishId': 'fish_18',
-          'commonName': 'Climbing Perch',
-          'scientificName': 'Anabas testudineus',
-          'localName': 'Climbing Perch',
-          'habitat': 'Freshwater',
-          'sizeRange': '20–25 cm',
-          'identifyingFeatures': [
-            'Brown body coloration',
-            'Can breathe air and survive out of water',
-          ],
-          'imageUrl': 'assets/images/fish/fish (18).png',
-        },
-        {
-          'fishId': 'fish_19',
-          'commonName': 'Trevally',
-          'scientificName': 'Carangidae spp',
-          'localName': 'Trevally',
-          'habitat': 'Saltwater',
-          'sizeRange': '30–50 cm',
-          'identifyingFeatures': [
-            'Silver body with forked tail',
-            'Streamlined, powerful build',
-          ],
-          'imageUrl': 'assets/images/fish/fish (19).png',
-        },
-        {
-          'fishId': 'fish_20',
-          'commonName': 'Grouper',
-          'scientificName': 'Serranidae spp',
-          'localName': 'Grouper',
-          'habitat': 'Saltwater',
-          'sizeRange': '40–80 cm',
-          'identifyingFeatures': [
-            'Large mouth and robust body',
-            'Variable color patterns',
-          ],
-          'imageUrl': 'assets/images/fish/fish (20).png',
-        },
-        {
-          'fishId': 'fish_21',
-          'commonName': 'Red Snapper',
-          'scientificName': 'Lutjanidae spp',
-          'localName': 'Snapper',
-          'habitat': 'Saltwater',
-          'sizeRange': '25–40 cm',
-          'identifyingFeatures': [
-            'Red to pink body coloration',
-            'Sharp teeth and pointed snout',
-          ],
-          'imageUrl': 'assets/images/fish/fish (21).png',
-        },
-        {
-          'fishId': 'fish_22',
-          'commonName': 'Goatfish',
-          'scientificName': 'Mullidae spp',
-          'localName': 'Goatfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Yellow to red body coloration',
-            'Two barbels under chin',
-          ],
-          'imageUrl': 'assets/images/fish/fish (22).png',
-        },
-        {
-          'fishId': 'fish_23',
-          'commonName': 'Emperor',
-          'scientificName': 'Lethrinus lentjan',
-          'localName': 'Bitilya',
-          'habitat': 'Saltwater',
-          'sizeRange': '35–50 cm',
-          'identifyingFeatures': [
-            'Blue-green back with silver sides',
-            'Thick lips and robust body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (23).png',
-        },
-        {
-          'fishId': 'fish_24',
-          'commonName': 'Indo-Pacific Tarpon',
-          'scientificName': 'Megalops cyprinoides',
-          'localName': 'Buan-buan',
-          'habitat': 'Saltwater',
-          'sizeRange': '80–100 cm',
-          'identifyingFeatures': [
-            'Large silver body with large scales',
-            'Upturned mouth',
-          ],
-          'imageUrl': 'assets/images/fish/fish (24).png',
-        },
-        {
-          'fishId': 'fish_25',
-          'commonName': 'Dolphinfish',
-          'scientificName': 'Coryphaena hippurus',
-          'localName': 'Dorado',
-          'habitat': 'Saltwater',
-          'sizeRange': '50–80 cm',
-          'identifyingFeatures': [
-            'Golden-green iridescent coloring',
-            'Blunt forehead and long dorsal fin',
-          ],
-          'imageUrl': 'assets/images/fish/fish (25).png',
-        },
-        {
-          'fishId': 'fish_26',
-          'commonName': 'Threadfin Salmon',
-          'scientificName': 'Eleutheronema tetradactylum',
-          'localName': 'Salmon',
-          'habitat': 'Saltwater',
-          'sizeRange': '80–120 cm',
-          'identifyingFeatures': [
-            'Silver body',
-            'Long thread-like pectoral fin rays',
-          ],
-          'imageUrl': 'assets/images/fish/fish (26).png',
-        },
-        {
-          'fishId': 'fish_27',
-          'commonName': 'Red Bigeye',
-          'scientificName': 'Priacanthus macracanthus',
-          'localName': 'Dilat',
-          'habitat': 'Saltwater',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Red body coloration',
-            'Very large eyes',
-          ],
-          'imageUrl': 'assets/images/fish/fish (27).png',
-        },
-        {
-          'fishId': 'fish_28',
-          'commonName': 'Moonfish',
-          'scientificName': 'Mene maculata',
-          'localName': 'Chabeta',
-          'habitat': 'Saltwater',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Disc-shaped, highly compressed body',
-            'Silver body with dark spots',
-          ],
-          'imageUrl': 'assets/images/fish/fish (28).png',
-        },
-        {
-          'fishId': 'fish_29',
-          'commonName': 'Rabbit Fish',
-          'scientificName': 'Siganus sp',
-          'localName': 'Rabbit Fish',
-          'habitat': 'Saltwater',
-          'sizeRange': '25–30 cm',
-          'identifyingFeatures': [
-            'Brown to green body',
-            'Venomous spines on fins',
-          ],
-          'imageUrl': 'assets/images/fish/fish (29).png',
-        },
-        {
-          'fishId': 'fish_30',
-          'commonName': 'Surgeonfish',
-          'scientificName': 'Acanthurus sp',
-          'localName': 'Surgeonfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Colorful body',
-            'Sharp scalpel-like spine on tail base',
-          ],
-          'imageUrl': 'assets/images/fish/fish (30).png',
-        },
-        {
-          'fishId': 'fish_31',
-          'commonName': 'Butterflyfish',
-          'scientificName': 'Chaetodon sp',
-          'localName': 'Butterflyfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Colorful patterns and stripes',
-            'Disc-shaped, compressed body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (31).png',
-        },
-        {
-          'fishId': 'fish_32',
-          'commonName': 'Damselfish',
-          'scientificName': 'Pomacentridae sp',
-          'localName': 'Damselfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '10–15 cm',
-          'identifyingFeatures': [
-            'Bright coloration (blue, yellow, or orange)',
-            'Small, oval-shaped body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (32).png',
-        },
-        {
-          'fishId': 'fish_33',
-          'commonName': 'Wrasse',
-          'scientificName': 'Labridae sp',
-          'localName': 'Wrasse',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Colorful body with variable patterns',
-            'Thick lips and elongated body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (33).png',
-        },
-        {
-          'fishId': 'fish_34',
-          'commonName': 'Parrotfish',
-          'scientificName': 'Scaridae sp',
-          'localName': 'Parrotfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '25–35 cm',
-          'identifyingFeatures': [
-            'Colorful body',
-            'Beak-like fused teeth',
-          ],
-          'imageUrl': 'assets/images/fish/fish (34).png',
-        },
-        {
-          'fishId': 'fish_35',
-          'commonName': 'Sweetlip',
-          'scientificName': 'Haemulidae sp',
-          'localName': 'Sweetlip',
-          'habitat': 'Saltwater',
-          'sizeRange': '30–40 cm',
-          'identifyingFeatures': [
-            'Striped or spotted pattern',
-            'Thick lips',
-          ],
-          'imageUrl': 'assets/images/fish/fish (35).png',
-        },
-        {
-          'fishId': 'fish_36',
-          'commonName': 'Barracuda',
-          'scientificName': 'Sphyraena sp',
-          'localName': 'Barracuda',
-          'habitat': 'Saltwater',
-          'sizeRange': '50–80 cm',
-          'identifyingFeatures': [
-            'Elongated, torpedo-shaped body',
-            'Large mouth with sharp teeth',
-          ],
-          'imageUrl': 'assets/images/fish/fish (36).png',
-        },
-        {
-          'fishId': 'fish_37',
-          'commonName': 'Jack',
-          'scientificName': 'Caranx sp',
-          'localName': 'Jack',
-          'habitat': 'Saltwater',
-          'sizeRange': '30–50 cm',
-          'identifyingFeatures': [
-            'Silver body',
-            'Forked tail and streamlined shape',
-          ],
-          'imageUrl': 'assets/images/fish/fish (37).png',
-        },
-        {
-          'fishId': 'fish_38',
-          'commonName': 'Asian Seabass',
-          'scientificName': 'Lates calcarifer',
-          'localName': 'Barramundi',
-          'habitat': 'Saltwater/Freshwater',
-          'sizeRange': '60–100 cm',
-          'identifyingFeatures': [
-            'Silver body with large scales',
-            'Concave forehead profile',
-          ],
-          'imageUrl': 'assets/images/fish/fish (38).png',
-        },
-        {
-          'fishId': 'fish_39',
-          'commonName': 'Eel',
-          'scientificName': 'Anguilla sp',
-          'localName': 'Eel',
-          'habitat': 'Freshwater/Saltwater',
-          'sizeRange': '60–100 cm',
-          'identifyingFeatures': [
-            'Long, snake-like body',
-            'Continuous dorsal, caudal, and anal fins',
-          ],
-          'imageUrl': 'assets/images/fish/fish (39).png',
-        },
-        {
-          'fishId': 'fish_40',
-          'commonName': 'Halfbeak',
-          'scientificName': 'Hemirhamphus sp',
-          'localName': 'Halfbeak',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–25 cm',
-          'identifyingFeatures': [
-            'Silver body',
-            'Extended lower jaw',
-          ],
-          'imageUrl': 'assets/images/fish/fish (40).png',
-        },
-        {
-          'fishId': 'fish_41',
-          'commonName': 'Needlefish',
-          'scientificName': 'Belonidae sp',
-          'localName': 'Needlefish',
-          'habitat': 'Saltwater',
-          'sizeRange': '30–40 cm',
-          'identifyingFeatures': [
-            'Elongated, needle-like body',
-            'Long, beak-like jaws with sharp teeth',
-          ],
-          'imageUrl': 'assets/images/fish/fish (41).png',
-        },
-        {
-          'fishId': 'fish_42',
-          'commonName': 'Flying Fish',
-          'scientificName': 'Exocoetus sp',
-          'localName': 'Flying Fish',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Large, wing-like pectoral fins',
-            'Can glide above water surface',
-          ],
-          'imageUrl': 'assets/images/fish/fish (42).png',
-        },
-        {
-          'fishId': 'fish_43',
-          'commonName': 'Seahorse',
-          'scientificName': 'Syngnathidae sp',
-          'localName': 'Seahorse',
-          'habitat': 'Saltwater',
-          'sizeRange': '10–15 cm',
-          'identifyingFeatures': [
-            'Horse-like head and neck',
-            'Prehensile tail',
-          ],
-          'imageUrl': 'assets/images/fish/fish (43).png',
-        },
-        {
-          'fishId': 'fish_44',
-          'commonName': 'Sea Dragon',
-          'scientificName': 'Hippocampus sp',
-          'localName': 'Sea Dragon',
-          'habitat': 'Saltwater',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Leaf-like appendages for camouflage',
-            'Elongated snout',
-          ],
-          'imageUrl': 'assets/images/fish/fish (44).png',
-        },
-        {
-          'fishId': 'fish_45',
-          'commonName': 'Pufferfish',
-          'scientificName': 'Tetraodontidae sp',
-          'localName': 'Pufferfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '10–20 cm',
-          'identifyingFeatures': [
-            'Can inflate body when threatened',
-            'Contains toxic tetrodotoxin',
-          ],
-          'imageUrl': 'assets/images/fish/fish (45).png',
-        },
-        {
-          'fishId': 'fish_46',
-          'commonName': 'Porcupinefish',
-          'scientificName': 'Diodon sp',
-          'localName': 'Porcupinefish',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Body covered with spines',
-            'Can inflate when threatened',
-          ],
-          'imageUrl': 'assets/images/fish/fish (46).png',
-        },
-        {
-          'fishId': 'fish_47',
-          'commonName': 'Boxfish',
-          'scientificName': 'Ostraciidae sp',
-          'localName': 'Boxfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '10–20 cm',
-          'identifyingFeatures': [
-            'Cube-shaped, box-like body',
-            'Bony carapace',
-          ],
-          'imageUrl': 'assets/images/fish/fish (47).png',
-        },
-        {
-          'fishId': 'fish_48',
-          'commonName': 'Pomfret',
-          'scientificName': 'Stromateidae sp',
-          'localName': 'Pomfret',
-          'habitat': 'Saltwater',
-          'sizeRange': '20–30 cm',
-          'identifyingFeatures': [
-            'Flat, disc-shaped body',
-            'Deeply forked tail',
-          ],
-          'imageUrl': 'assets/images/fish/fish (48).png',
-        },
-        {
-          'fishId': 'fish_49',
-          'commonName': 'Ribbonfish',
-          'scientificName': 'Trichiuridae sp',
-          'localName': 'Ribbonfish',
-          'habitat': 'Saltwater',
-          'sizeRange': '100–150 cm',
-          'identifyingFeatures': [
-            'Long, ribbon-like compressed body',
-            'Pointed tail without caudal fin',
-          ],
-          'imageUrl': 'assets/images/fish/fish (49).png',
-        },
-        {
-          'fishId': 'fish_50',
-          'commonName': 'Spotted Scat',
-          'scientificName': 'Scatophagus argus',
-          'localName': 'Kitang',
-          'habitat': 'Brackish Water',
-          'sizeRange': '15–20 cm',
-          'identifyingFeatures': [
-            'Silver-bronze body with black spots',
-            'Disc-shaped, compressed body',
-          ],
-          'imageUrl': 'assets/images/fish/fish (50).png',
-        },
-      ];
-      for (var fish in fishData) {
-        await _db.child('fish').child(fish['fishId']).set(fish);
+      _interpreter = await Interpreter.fromAsset('assets/models/model (1).tflite');
+      
+      // Get output shape from the model itself
+      final outputTensor = _interpreter!.getOutputTensor(0);
+      final outputShape = outputTensor.shape;
+      if (outputShape.length >= 2) {
+        _outputSize = outputShape.last; // e.g., 40
+      } else {
+        throw Exception('Unexpected output shape: $outputShape');
       }
-      print('✅ 50 Fish records initialized successfully');
+      
+      // Load labels (should have exactly _outputSize lines)
+      final labelString = await rootBundle.loadString('assets/models/labels.txt');
+      _classLabels = labelString
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      
+      if (_classLabels.length != _outputSize) {
+        debugPrint('⚠️ Warning: labels count (${_classLabels.length}) != model output size ($_outputSize)');
+      }
+      
+      debugPrint('✅ Model loaded: output size = $_outputSize');
+      setState(() {
+        _isModelReady = true;
+        _isLoading = false;
+      });
     } catch (e) {
-      print('❌ Error initializing fish: $e');
+      debugPrint('❌ Failed to load model: $e');
+      setState(() {
+        _statusMessage = 'AI model failed to load. Please restart the app.';
+        _isLoading = false;
+      });
     }
   }
 
-    // Initialize Map Locations (same as before)
-  Future<void> initializeMapLocations() async {
-    try {
-// Updated Map Locations with 2-3 locations per fish based on actual Philippine fishing areas
+  // --------------------------------------------------------------
+  // Image picker
+  // --------------------------------------------------------------
+  Future<void> _pickImage(ImageSource source) async {
+    if (!_isModelReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI model is still loading, please wait...')),
+      );
+      return;
+    }
 
-       List<Map<String, dynamic>> mapData = [
-    {'locationId': 'location_1', 'fishId': 'fish_1', 'latitude': 6.111500, 'longitude': 125.171500, 'region': 'General Santos'},
-    {'locationId': 'location_1b', 'fishId': 'fish_1', 'latitude': 13.683300, 'longitude': 123.766700, 'region': 'Lagonoy Gulf, Albay'},
-    {'locationId': 'location_1c', 'fishId': 'fish_1', 'latitude': 13.083300, 'longitude': 120.533300, 'region': 'Occidental Mindoro'},
-    {'locationId': 'location_2', 'fishId': 'fish_2', 'latitude': 14.599400, 'longitude': 120.984200, 'region': 'Manila Bay'},
-    {'locationId': 'location_2b', 'fishId': 'fish_2', 'latitude': 9.760400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_2c', 'fishId': 'fish_2', 'latitude': 10.315700, 'longitude': 123.085400, 'region': 'Negros'},
-    {'locationId': 'location_3', 'fishId': 'fish_3', 'latitude': 14.666700, 'longitude': 120.833300, 'region': 'Navotas'},
-    {'locationId': 'location_3b', 'fishId': 'fish_3', 'latitude': 6.927100, 'longitude': 122.072500, 'region': 'Zamboanga'},
-    {'locationId': 'location_3c', 'fishId': 'fish_3', 'latitude': 6.500000, 'longitude': 125.500000, 'region': 'Davao Gulf'},
-    {'locationId': 'location_4', 'fishId': 'fish_4', 'latitude': 10.315700, 'longitude': 123.885400, 'region': 'Cebu'},
-    {'locationId': 'location_4b', 'fishId': 'fish_4', 'latitude': 9.538100, 'longitude': 118.739900, 'region': 'Palawan'},
-    {'locationId': 'location_4c', 'fishId': 'fish_4', 'latitude': 7.073100, 'longitude': 125.611400, 'region': 'Mindanao'},
-    {'locationId': 'location_5', 'fishId': 'fish_5', 'latitude': 9.548100, 'longitude': 118.739900, 'region': 'Palawan'},
-    {'locationId': 'location_5b', 'fishId': 'fish_5', 'latitude': 14.609400, 'longitude': 120.984200, 'region': 'Manila Bay'},
-    {'locationId': 'location_5c', 'fishId': 'fish_5', 'latitude': 13.756500, 'longitude': 121.058300, 'region': 'Batangas'},
-    {'locationId': 'location_6', 'fishId': 'fish_6', 'latitude': 7.083100, 'longitude': 125.611400, 'region': 'Mindanao'},
-    {'locationId': 'location_6b', 'fishId': 'fish_6', 'latitude': 6.524400, 'longitude': 124.211800, 'region': 'Maguindanao'},
-    {'locationId': 'location_6c', 'fishId': 'fish_6', 'latitude': 9.770400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_7', 'fishId': 'fish_7', 'latitude': 9.780400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_7b', 'fishId': 'fish_7', 'latitude': 9.581000, 'longitude': 123.757800, 'region': 'Panglao, Bohol'},
-    {'locationId': 'location_7c', 'fishId': 'fish_7', 'latitude': 10.325700, 'longitude': 123.885400, 'region': 'Cebu'},
-    {'locationId': 'location_8', 'fishId': 'fish_8', 'latitude': 14.312700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
-    {'locationId': 'location_8b', 'fishId': 'fish_8', 'latitude': 13.978100, 'longitude': 120.988100, 'region': 'Taal Lake'},
-    {'locationId': 'location_8c', 'fishId': 'fish_8', 'latitude': 13.693300, 'longitude': 123.766700, 'region': 'Bicol'},
-    {'locationId': 'location_9', 'fishId': 'fish_9', 'latitude': 16.043300, 'longitude': 120.333300, 'region': 'Dagupan, Pangasinan'},
-    {'locationId': 'location_9b', 'fishId': 'fish_9', 'latitude': 14.794200, 'longitude': 120.880600, 'region': 'Bulacan'},
-    {'locationId': 'location_9c', 'fishId': 'fish_9', 'latitude': 10.720200, 'longitude': 122.562100, 'region': 'Iloilo'},
-    {'locationId': 'location_10', 'fishId': 'fish_10', 'latitude': 14.879100, 'longitude': 120.559600, 'region': 'Pampanga'},
-    {'locationId': 'location_10b', 'fishId': 'fish_10', 'latitude': 14.269100, 'longitude': 121.411300, 'region': 'Laguna'},
-    {'locationId': 'location_10c', 'fishId': 'fish_10', 'latitude': 13.193900, 'longitude': 121.205800, 'region': 'Mindoro'},
-    {'locationId': 'location_11', 'fishId': 'fish_11', 'latitude': 14.279100, 'longitude': 121.411300, 'region': 'Laguna'},
-    {'locationId': 'location_11b', 'fishId': 'fish_11', 'latitude': 15.483300, 'longitude': 120.716700, 'region': 'Central Luzon'},
-    {'locationId': 'location_11c', 'fishId': 'fish_11', 'latitude': 7.093100, 'longitude': 125.611400, 'region': 'Mindanao'},
-    {'locationId': 'location_12', 'fishId': 'fish_12', 'latitude': 14.289100, 'longitude': 121.411300, 'region': 'Laguna'},
-    {'locationId': 'location_12b', 'fishId': 'fish_12', 'latitude': 14.889100, 'longitude': 120.559600, 'region': 'Pampanga'},
-    {'locationId': 'location_12c', 'fishId': 'fish_12', 'latitude': 7.103100, 'longitude': 125.611400, 'region': 'Mindanao'},
-    {'locationId': 'location_13', 'fishId': 'fish_13', 'latitude': 14.322700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
-    {'locationId': 'location_13b', 'fishId': 'fish_13', 'latitude': 17.613200, 'longitude': 121.727000, 'region': 'Cagayan River'},
-    {'locationId': 'location_13c', 'fishId': 'fish_13', 'latitude': 8.228000, 'longitude': 124.245200, 'region': 'Mindanao Rivers'},
-    {'locationId': 'location_14', 'fishId': 'fish_14', 'latitude': 14.332700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
-    {'locationId': 'location_14b', 'fishId': 'fish_14', 'latitude': 14.899100, 'longitude': 120.559600, 'region': 'Pampanga'},
-    {'locationId': 'location_14c', 'fishId': 'fish_14', 'latitude': 13.703300, 'longitude': 123.766700, 'region': 'Bicol'},
-    {'locationId': 'location_15', 'fishId': 'fish_15', 'latitude': 14.342700, 'longitude': 121.197800, 'region': 'Laguna de Bay'},
-    {'locationId': 'location_15b', 'fishId': 'fish_15', 'latitude': 13.988100, 'longitude': 120.988100, 'region': 'Taal Lake'},
-    {'locationId': 'location_15c', 'fishId': 'fish_15', 'latitude': 7.113100, 'longitude': 125.611400, 'region': 'Mindanao Lakes'},
-    {'locationId': 'location_16', 'fishId': 'fish_16', 'latitude': 14.352700, 'longitude': 121.197800, 'region': 'Laguna'},
-    {'locationId': 'location_16b', 'fishId': 'fish_16', 'latitude': 7.123100, 'longitude': 125.611400, 'region': 'Mindanao'},
-    {'locationId': 'location_16c', 'fishId': 'fish_16', 'latitude': 14.804200, 'longitude': 120.880600, 'region': 'Bulacan'},
-    {'locationId': 'location_17', 'fishId': 'fish_17', 'latitude': 13.203900, 'longitude': 121.205800, 'region': 'Mindoro'},
-    {'locationId': 'location_17b', 'fishId': 'fish_17', 'latitude': 14.909100, 'longitude': 120.559600, 'region': 'Pampanga'},
-    {'locationId': 'location_17c', 'fishId': 'fish_17', 'latitude': 16.975400, 'longitude': 121.810700, 'region': 'Isabela'},
-    {'locationId': 'location_18', 'fishId': 'fish_18', 'latitude': 13.416600, 'longitude': 122.016700, 'region': 'Marinduque'},
-    {'locationId': 'location_18b', 'fishId': 'fish_18', 'latitude': 14.299100, 'longitude': 121.411300, 'region': 'Laguna'},
-    {'locationId': 'location_18c', 'fishId': 'fish_18', 'latitude': 14.919100, 'longitude': 120.559600, 'region': 'Pampanga'},
-    {'locationId': 'location_19', 'fishId': 'fish_19', 'latitude': 14.750500, 'longitude': 121.947500, 'region': 'Quezon'},
-    {'locationId': 'location_19b', 'fishId': 'fish_19', 'latitude': 13.766500, 'longitude': 121.058300, 'region': 'Batangas'},
-    {'locationId': 'location_19c', 'fishId': 'fish_19', 'latitude': 9.790400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_20', 'fishId': 'fish_20', 'latitude': 11.690100, 'longitude': 122.000100, 'region': 'Aklan'},
-    {'locationId': 'location_20b', 'fishId': 'fish_20', 'latitude': 9.800400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_20c', 'fishId': 'fish_20', 'latitude': 9.849900, 'longitude': 124.143500, 'region': 'Bohol'},
-    {'locationId': 'location_21', 'fishId': 'fish_21', 'latitude': 6.927100, 'longitude': 125.409200, 'region': 'Davao'},
-    {'locationId': 'location_21b', 'fishId': 'fish_21', 'latitude': 6.937100, 'longitude': 122.072500, 'region': 'Zamboanga'},
-    {'locationId': 'location_21c', 'fishId': 'fish_21', 'latitude': 9.810400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_22', 'fishId': 'fish_22', 'latitude': 6.111500, 'longitude': 125.191500, 'region': 'General Santos'},
-    {'locationId': 'location_22b', 'fishId': 'fish_22', 'latitude': 6.937100, 'longitude': 125.409200, 'region': 'Davao'},
-    {'locationId': 'location_22c', 'fishId': 'fish_22', 'latitude': 6.076500, 'longitude': 125.630600, 'region': 'Sarangani'},
-    {'locationId': 'location_23', 'fishId': 'fish_23', 'latitude': 6.947100, 'longitude': 122.072500, 'region': 'Zamboanga'},
-    {'locationId': 'location_23b', 'fishId': 'fish_23', 'latitude': 9.820400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_23c', 'fishId': 'fish_23', 'latitude': 5.129100, 'longitude': 119.958200, 'region': 'Tawi-Tawi'},
-    {'locationId': 'location_24', 'fishId': 'fish_24', 'latitude': 11.999000, 'longitude': 120.205000, 'region': 'Coron, Palawan'},
-    {'locationId': 'location_24b', 'fishId': 'fish_24', 'latitude': 11.194900, 'longitude': 119.401000, 'region': 'El Nido, Palawan'},
-    {'locationId': 'location_24c', 'fishId': 'fish_24', 'latitude': 12.164200, 'longitude': 120.006900, 'region': 'Busuanga'},
-    {'locationId': 'location_25', 'fishId': 'fish_25', 'latitude': 9.850900, 'longitude': 123.419700, 'region': 'Sipalay'},
-    {'locationId': 'location_25b', 'fishId': 'fish_25', 'latitude': 20.448600, 'longitude': 121.969700, 'region': 'Batanes'},
-    {'locationId': 'location_25c', 'fishId': 'fish_25', 'latitude': 15.508200, 'longitude': 119.969200, 'region': 'Zambales'},
-    {'locationId': 'location_26', 'fishId': 'fish_26', 'latitude': 9.683300, 'longitude': 125.466700, 'region': 'Dinagat'},
-    {'locationId': 'location_26b', 'fishId': 'fish_26', 'latitude': 9.788300, 'longitude': 125.504000, 'region': 'Surigao'},
-    {'locationId': 'location_26c', 'fishId': 'fish_26', 'latitude': 10.911700, 'longitude': 125.006100, 'region': 'Leyte Gulf'},
-    {'locationId': 'location_27', 'fishId': 'fish_27', 'latitude': 9.927400, 'longitude': 123.395000, 'region': 'Moalboal, Cebu'},
-    {'locationId': 'location_27b', 'fishId': 'fish_27', 'latitude': 10.335700, 'longitude': 123.885400, 'region': 'Cebu'},
-    {'locationId': 'location_27c', 'fishId': 'fish_27', 'latitude': 9.859900, 'longitude': 124.143500, 'region': 'Bohol'},
-    {'locationId': 'location_28', 'fishId': 'fish_28', 'latitude': 9.798300, 'longitude': 125.504000, 'region': 'Surigao'},
-    {'locationId': 'location_28b', 'fishId': 'fish_28', 'latitude': 9.693300, 'longitude': 125.466700, 'region': 'Dinagat'},
-    {'locationId': 'location_28c', 'fishId': 'fish_28', 'latitude': 10.720200, 'longitude': 124.752100, 'region': 'Leyte'},
-    {'locationId': 'location_29', 'fishId': 'fish_29', 'latitude': 10.730200, 'longitude': 124.752100, 'region': 'Leyte'},
-    {'locationId': 'location_29b', 'fishId': 'fish_29', 'latitude': 11.579900, 'longitude': 125.006000, 'region': 'Samar'},
-    {'locationId': 'location_29c', 'fishId': 'fish_29', 'latitude': 9.869900, 'longitude': 124.143500, 'region': 'Bohol'},
-    {'locationId': 'location_30', 'fishId': 'fish_30', 'latitude': 10.345700, 'longitude': 123.885400, 'region': 'Cebu'},
-    {'locationId': 'location_30b', 'fishId': 'fish_30', 'latitude': 9.879900, 'longitude': 124.143500, 'region': 'Bohol'},
-    {'locationId': 'location_30c', 'fishId': 'fish_30', 'latitude': 9.830400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_31', 'fishId': 'fish_31', 'latitude': 9.889900, 'longitude': 124.143500, 'region': 'Bohol'},
-    {'locationId': 'location_31b', 'fishId': 'fish_31', 'latitude': 10.355700, 'longitude': 123.885400, 'region': 'Cebu'},
-    {'locationId': 'location_31c', 'fishId': 'fish_31', 'latitude': 9.840400, 'longitude': 118.728200, 'region': 'Palawan'},
-    {'locationId': 'location_32', 'fishId': 'fish_32', 'latitude': 8.947500, 'longitude': 125.540600, 'region': 'Butuan'},
-    {'locationId': 'location_32b', 'fishId': 'fish_32', 'latitude': 9.808300, 'longitude': 125.504000, 'region': 'Surigao'},
-    {'locationId': 'location_32c', 'fishId': 'fish_32', 'latitude': 10.740200, 'longitude': 124.752100, 'region': 'Leyte'},
-    {'locationId': 'location_33', 'fishId': 'fish_33', 'latitude': 9.078100, 'longitude': 126.195900, 'region': 'Tandag'},
-    {'locationId': 'location_33b', 'fishId': 'fish_33', 'latitude': 9.818300, 'longitude': 125.504000, 'region': 'Surigao'},
-    {'locationId': 'location_33c', 'fishId': 'fish_33', 'latitude': 9.859900, 'longitude': 126.045900, 'region': 'Siargao'},
-    {'locationId': 'location_34', 'fishId': 'fish_34', 'latitude': 7.200400, 'longitude': 124.245200, 'region': 'Cotabato'},
-    {'locationId': 'location_34b', 'fishId': 'fish_34', 'latitude': 6.510000, 'longitude': 125.500000, 'region': 'Davao Gulf'},
-    {'locationId': 'location_34c', 'fishId': 'fish_34', 'latitude': 6.121500, 'longitude': 125.191500, 'region': 'General Santos'},
-    {'locationId': 'location_35', 'fishId': 'fish_35', 'latitude': 6.946300, 'longitude': 124.408600, 'region': 'Maguindanao'},
-    {'locationId': 'location_35b', 'fishId': 'fish_35', 'latitude': 6.957100, 'longitude': 122.072500, 'region': 'Zamboanga'},
-    {'locationId': 'location_35c', 'fishId': 'fish_35', 'latitude': 6.538900, 'longitude': 121.973300, 'region': 'Basilan'},
-    {'locationId': 'location_36', 'fishId': 'fish_36', 'latitude': 7.210400, 'longitude': 124.245200, 'region': 'Cotabato City'},
-    {'locationId': 'location_36b', 'fishId': 'fish_36', 'latitude': 6.967100, 'longitude': 122.072500, 'region': 'Zamboanga'},
-    {'locationId': 'location_36c', 'fishId': 'fish_36', 'latitude': 6.947100, 'longitude': 125.409200, 'region': 'Davao'},
-    {'locationId': 'location_37', 'fishId': 'fish_37', 'latitude': 8.211100, 'longitude': 126.321400, 'region': 'Bislig'},
-    {'locationId': 'location_37b', 'fishId': 'fish_37', 'latitude': 8.379500, 'longitude': 126.355800, 'region': 'Hinatuan'},
-    {'locationId': 'location_37c', 'fishId': 'fish_37', 'latitude': 9.088100, 'longitude': 126.195900, 'region': 'Tandag'},
-    {'locationId': 'location_38', 'fishId': 'fish_38', 'latitude': 8.134400, 'longitude': 126.045500, 'region': 'Bunawan'},
-    {'locationId': 'location_38b', 'fishId': 'fish_38', 'latitude': 8.957500, 'longitude': 125.540600, 'region': 'Agusan River'},
-    {'locationId': 'location_38c', 'fishId': 'fish_38', 'latitude': 8.967500, 'longitude': 125.540600, 'region': 'Butuan Bay'},
-    {'locationId': 'location_39', 'fishId': 'fish_39', 'latitude': 9.098100, 'longitude': 126.195900, 'region': 'Tandag Bay'},
-    {'locationId': 'location_39b', 'fishId': 'fish_39', 'latitude': 14.362700, 'longitude': 121.197800, 'region': 'Laguna'},
-    {'locationId': 'location_39c', 'fishId': 'fish_39', 'latitude': 13.213900, 'longitude': 121.205800, 'region': 'Mindoro'},
-    {'locationId': 'location_40', 'fishId': 'fish_40', 'latitude': 10.333300, 'longitude': 125.166700, 'region': 'Southern Leyte'},
-    {'locationId': 'location_40b', 'fishId': 'fish_40', 'latitude': 9.828300, 'longitude': 125.504000, 'region': 'Surigao'},
-    {'locationId': 'location_40c', 'fishId': 'fish_40', 'latitude': 9.899900, 'longitude': 124.143500, 'region': 'Bohol'},
-    {'locationId': 'location_41', 'fishId': 'fish_41', 'latitude': 11.556400, 'longitude': 122.513600, 'region': 'Panay'},
-    {'locationId': 'location_41b', 'fishId': 'fish_41', 'latitude': 11.700100, 'longitude': 122.000100, 'region': 'Aklan'},
-    {'locationId': 'location_41c', 'fishId': 'fish_41', 'latitude': 11.033300, 'longitude': 122.000000, 'region': 'Antique'},
-    {'locationId': 'location_42', 'fishId': 'fish_42', 'latitude': 13.500000, 'longitude': 123.000000, 'region': 'Philippine Sea off Bicol'},
-    {'locationId': 'location_42b', 'fishId': 'fish_42', 'latitude': 10.500000, 'longitude': 124.500000, 'region': 'Visayan Sea'},
-    {'locationId': 'location_42c', 'fishId': 'fish_42', 'latitude': 8.500000, 'longitude': 126.000000, 'region': 'Offshore Surigao / Pacific side'},     
-    {'locationId': 'location_43', 'fishId': 'fish_43', 'latitude': 9.591000, 'longitude': 123.757800, 'region': 'Panglao, Bohol'},
-    {'locationId': 'location_43b', 'fishId': 'fish_43', 'latitude': 11.204900, 'longitude': 119.401000, 'region': 'El Nido, Palawan'},
-    {'locationId': 'location_43c', 'fishId': 'fish_43', 'latitude': 9.937400, 'longitude': 123.395000, 'region': 'Moalboal, Cebu'},
-    {'locationId': 'location_44', 'fishId': 'fish_44', 'latitude': 9.860900, 'longitude': 123.419700, 'region': 'Sipalay, Negros'},
-    {'locationId': 'location_44b', 'fishId': 'fish_44', 'latitude': 12.009000, 'longitude': 120.205000, 'region': 'Coron, Palawan'},
-    {'locationId': 'location_44c', 'fishId': 'fish_44', 'latitude': 9.303100, 'longitude': 123.305600, 'region': 'Oslob, Cebu'},
-    {'locationId': 'location_45', 'fishId': 'fish_45', 'latitude': 9.044200, 'longitude': 123.292500, 'region': 'Apo Island, Negros'},
-    {'locationId': 'location_45b', 'fishId': 'fish_45', 'latitude': 10.365700, 'longitude': 123.885400, 'region': 'Cebu Reefs'},
-    {'locationId': 'location_45c', 'fishId': 'fish_45', 'latitude': 11.967300, 'longitude': 121.924700, 'region': 'Boracay, Aklan'},
-    {'locationId': 'location_46', 'fishId': 'fish_46', 'latitude': 9.850400, 'longitude': 118.728200, 'region': 'Puerto Princesa, Palawan'},
-    {'locationId': 'location_46b', 'fishId': 'fish_46', 'latitude': 10.196400, 'longitude': 123.761800, 'region': 'Camotes Sea'},
-    {'locationId': 'location_46c', 'fishId': 'location_46c', 'latitude': 11.200000, 'longitude': 125.005000, 'region': 'Southern Leyte Reefs'},
-    {'locationId': 'location_47', 'fishId': 'fish_47', 'latitude': 9.909900, 'longitude': 124.143500, 'region': 'Bohol Reefs'},
-    {'locationId': 'location_47b', 'fishId': 'fish_47', 'latitude': 11.566400, 'longitude': 122.513600, 'region': 'Panay Reefs'},
-    {'locationId': 'location_47c', 'fishId': 'fish_47', 'latitude': 5.978800, 'longitude': 126.024500, 'region': 'Davao Oriental Reefs'},
-    {'locationId': 'location_48', 'fishId': 'fish_48', 'latitude': 10.750200, 'longitude': 124.752100, 'region': 'Leyte Gulf'},
-    {'locationId': 'location_48b', 'fishId': 'fish_48', 'latitude': 11.589900, 'longitude': 125.006000, 'region': 'Samar Sea'},
-    {'locationId': 'location_48c', 'fishId': 'fish_48', 'latitude': 15.518200, 'longitude': 119.969200, 'region': 'West Philippine Sea off Zambales'},   
-    {'locationId': 'location_49', 'fishId': 'fish_49', 'latitude': 13.093300, 'longitude': 120.533300, 'region': 'Occidental Mindoro Shelf'},
-    {'locationId': 'location_49b', 'fishId': 'fish_49', 'latitude': 16.053300, 'longitude': 120.333300, 'region': 'Lingayen Gulf Offshore'},
-    {'locationId': 'location_49c', 'fishId': 'fish_49', 'latitude': 6.520000, 'longitude': 125.500000, 'region': 'Davao Gulf Slope'},
-    {'locationId': 'location_50', 'fishId': 'fish_50', 'latitude': 14.372700, 'longitude': 121.197800, 'region': 'Laguna de Bay River Mouths'},
-    {'locationId': 'location_50b', 'fishId': 'fish_50', 'latitude': 14.619400, 'longitude': 120.984200, 'region': 'Manila Bay Estuaries'},
-    {'locationId': 'location_50c', 'fishId': 'fish_50', 'latitude': 9.745700, 'longitude': 118.730200, 'region': 'Puerto Princesa Bay Mangroves'},       
-  ];
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 90,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
+    if (picked == null) return;
 
+    final imageFile = File(picked.path);
+    setState(() {
+      _imageFile = imageFile;
+      _isLoading = true;
+      _matchedFish = [];
+      _detectedLabels = [];
+      _statusMessage = 'Identifying fish...';
+    });
 
-      for (var location in mapData) {
-        await _db.child('map').child(location['locationId']).set(location);
+    await _classifyImage(imageFile);
+  }
+
+  // --------------------------------------------------------------
+  // Preprocess image to 224x224, normalized [-1,1]
+  // --------------------------------------------------------------
+  Future<Float32List> _preprocessImage(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    img.Image? image = img.decodeImage(bytes);
+    if (image == null) throw Exception('Failed to decode image');
+
+    // Resize keeping aspect ratio, then center crop to 224x224
+    final scale = _inputSize / (image.width < image.height ? image.width : image.height);
+    int newWidth = (image.width * scale).round();
+    int newHeight = (image.height * scale).round();
+    image = img.copyResize(image, width: newWidth, height: newHeight);
+
+    final cropX = (image.width - _inputSize) ~/ 2;
+    final cropY = (image.height - _inputSize) ~/ 2;
+    image = img.copyCrop(image, x: cropX, y: cropY, width: _inputSize, height: _inputSize);
+
+    // Normalize to [-1, 1] (assuming model expects that)
+    final input = Float32List(1 * _inputSize * _inputSize * 3);
+    int idx = 0;
+    for (int y = 0; y < _inputSize; y++) {
+      for (int x = 0; x < _inputSize; x++) {
+        final pixel = image.getPixel(x, y);
+        input[idx++] = (pixel.r / 127.5) - 1.0;
+        input[idx++] = (pixel.g / 127.5) - 1.0;
+        input[idx++] = (pixel.b / 127.5) - 1.0;
       }
-      print('✅ Map locations initialized successfully (with extra locations)');
+    }
+    return input;
+  }
+
+  // --------------------------------------------------------------
+  // Run inference (model outputs raw scores or probabilities)
+  // --------------------------------------------------------------
+  Future<void> _classifyImage(File imageFile) async {
+    if (_interpreter == null) return;
+
+    try {
+      // Preprocess
+      final flatInput = await _preprocessImage(imageFile);
+      final input = List.generate(1, (_) => List.generate(_inputSize, (_) => List.generate(_inputSize, (_) => List.filled(3, 0.0))));
+      int idx = 0;
+      for (int h = 0; h < _inputSize; h++) {
+        for (int w = 0; w < _inputSize; w++) {
+          for (int c = 0; c < 3; c++) {
+            input[0][h][w][c] = flatInput[idx++];
+          }
+        }
+      }
+
+      // Output buffer with correct size (dynamic)
+      final output = List.filled(1 * _outputSize, 0.0).reshape([1, _outputSize]);
+
+      // Run inference
+      _interpreter!.run(input, output);
+
+      // Get raw output scores (could be logits or probabilities)
+      final scores = output[0];
+
+      // Convert to probabilities (if needed: if scores are not already in [0,1])
+      // We'll apply softmax to be safe (it won't hurt if already probabilities)
+      final probabilities = _softmax(scores);
+
+      // Get top 5 predictions
+      final topPredictions = _getTopPredictions(probabilities, 5);
+
+      // Map to your fish species
+      final matched = _mapToLocalFish(topPredictions);
+
+      setState(() {
+        if (matched.isEmpty) {
+          _statusMessage = 'No matching fish found. Try manual search.';
+          _matchedFish = [];
+          _detectedLabels = [];
+        } else {
+          _matchedFish = matched.map((e) => e.$1).toList();
+          _detectedLabels = matched.map((e) => '${e.$1.commonName} (${(e.$2 * 100).toStringAsFixed(1)}%)').toList();
+          _statusMessage = '';
+        }
+        _isLoading = false;
+      });
     } catch (e) {
-      print('❌ Error initializing map locations: $e');
+      debugPrint('Classification error: $e');
+      setState(() {
+        _statusMessage = 'Classification failed. Please try manual search.';
+        _isLoading = false;
+      });
     }
   }
 
-  // Initialize all data
-  Future<void> initializeAllData() async {
-    await initializeFish();
-    await initializeMapLocations();
-    print('✅ All data initialization complete');
+  // Softmax conversion (safe even if input is already probabilities)
+  List<double> _softmax(List<double> logits) {
+    final maxLogit = logits.reduce((a, b) => a > b ? a : b);
+    final expValues = logits.map((x) => exp(x - maxLogit)).toList();
+    final sumExp = expValues.reduce((a, b) => a + b);
+    return expValues.map<double>((x) => x / sumExp).toList();
+  }
+
+  // Get top-K indices and labels (using actual model outputs)
+  List<(String, double)> _getTopPredictions(List<double> probabilities, int topK) {
+    final indices = List.generate(probabilities.length, (i) => i);
+    indices.sort((a, b) => probabilities[b].compareTo(probabilities[a]));
+    final result = <(String, double)>[];
+    for (int i = 0; i < topK && i < indices.length; i++) {
+      final idx = indices[i];
+      if (idx < _classLabels.length) {
+        result.add((_classLabels[idx], probabilities[idx]));
+      }
+    }
+    return result;
+  }
+
+  // Map model output labels to your fish objects using keyword matching
+  List<(Fish, double)> _mapToLocalFish(List<(String, double)> predictions) {
+    final Map<Fish, double> scoreMap = {};
+
+    for (var pred in predictions) {
+      final label = pred.$1.toLowerCase();
+      final confidence = pred.$2;
+
+      // Find which fish keywords are contained in the label
+      Set<String> matchedFishNames = {};
+      for (var entry in _keywordToFish.entries) {
+        final keyword = entry.key.toLowerCase();
+        if (label.contains(keyword) || keyword.contains(label)) {
+          matchedFishNames.addAll(entry.value);
+        }
+      }
+
+      // Also split label into words (e.g., "red_snapper" -> ["red","snapper"])
+      final words = label.split(RegExp(r'[ ,_-]+'));
+      for (var word in words) {
+        if (word.length < 3) continue;
+        for (var entry in _keywordToFish.entries) {
+          if (entry.key.contains(word) || word.contains(entry.key)) {
+            matchedFishNames.addAll(entry.value);
+          }
+        }
+      }
+
+      // Add confidence to matching fish objects
+      for (var fish in widget.allSpecies) {
+        if (matchedFishNames.contains(fish.commonName)) {
+          scoreMap[fish] = (scoreMap[fish] ?? 0.0) + confidence;
+        }
+      }
+    }
+
+    final matches = scoreMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final maxScore = matches.isNotEmpty ? matches.first.value : 1.0;
+    return matches
+        .map((e) => (e.key, (e.value / maxScore).clamp(0.0, 1.0)))
+        .toList();
+  }
+
+  // --------------------------------------------------------------
+  // Manual search (unchanged)
+  // --------------------------------------------------------------
+  void _performManualSearch() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a fish name to search')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final matches = widget.allSpecies.where((fish) {
+        return fish.commonName.toLowerCase().contains(query) ||
+            fish.scientificName.toLowerCase().contains(query) ||
+            fish.localName.toLowerCase().contains(query);
+      }).toList();
+      if (mounted) {
+        setState(() {
+          _matchedFish = matches;
+          _detectedLabels = [query];
+          _statusMessage = matches.isEmpty ? 'No fish found matching "$query"' : '';
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  void _navigateToFishDetail(Fish fish) {
+    context.push('/fish/${fish.id}');
+  }
+
+  @override
+  void dispose() {
+    _interpreter?.close();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // --------------------------------------------------------------
+  // UI BUILD (unchanged, omitted for brevity, but must be included)
+  // --------------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Search by Photo'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildImagePreview(),
+                  const SizedBox(height: 16),
+                  _buildActionButtons(),
+                  if (_detectedLabels.isNotEmpty && !_isLoading && _imageFile != null)
+                    _buildLabelsSection(),
+                  const SizedBox(height: 24),
+                  _buildDivider(),
+                  const SizedBox(height: 16),
+                  _buildManualSearch(),
+                  const SizedBox(height: 16),
+                  if (_isLoading) _buildLoadingIndicator(),
+                  if (_matchedFish.isNotEmpty && !_isLoading)
+                    _buildResultsCount(),
+                  if (_matchedFish.isNotEmpty && !_isLoading)
+                    _buildResultsList(),
+                  if (_statusMessage.isNotEmpty && !_isLoading && _matchedFish.isEmpty)
+                    _buildNoResults(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // All the UI helper methods (unchanged from your original)
+  Widget _buildImagePreview() {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: _imageFile != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.file(_imageFile!, fit: BoxFit.cover),
+            )
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.camera_alt, size: 48, color: Colors.grey[400]),
+                const SizedBox(height: 8),
+                Text(
+                  'Take or select a photo of a fish',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'AI will identify the fish offline',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _isLoading ? null : () => _pickImage(ImageSource.camera),
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Camera'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _isLoading ? null : () => _pickImage(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library),
+            label: const Text('Gallery'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabelsSection() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 16, color: Colors.blue[700]),
+              const SizedBox(width: 8),
+              Text(
+                'AI Predictions:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[700], fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: _detectedLabels.take(6).map((label) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Text(label, style: TextStyle(fontSize: 12, color: Colors.blue[800])),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Colors.grey[300])),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text('OR', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
+        ),
+        Expanded(child: Divider(color: Colors.grey[300])),
+      ],
+    );
+  }
+
+  Widget _buildManualSearch() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.search, size: 20, color: Colors.green[700]),
+              const SizedBox(width: 8),
+              const Text('Manual Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Search by common name, scientific name, or local name:',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  enabled: !_isLoading,
+                  decoration: InputDecoration(
+                    hintText: 'Enter fish name...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onSubmitted: (_) => _performManualSearch(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _performManualSearch,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Search'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return const Padding(
+      padding: EdgeInsets.all(32),
+      child: Column(
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text('Analyzing image with AI...'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultsCount() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(
+        'Found ${_matchedFish.length} matching fish',
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+    );
+  }
+
+  Widget _buildResultsList() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _matchedFish.length,
+      itemBuilder: (context, i) {
+        final fish = _matchedFish[i];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            onTap: () => _navigateToFishDetail(fish),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: fish.imageUrl.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.asset(
+                              fish.imageUrl,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(Icons.set_meal, color: Colors.blue[300], size: 30),
+                            ),
+                          )
+                        : Icon(Icons.set_meal, color: Colors.blue[300], size: 30),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text(fish.commonName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (i < _detectedLabels.length)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(8)),
+                                child: Text(_detectedLabels[i], style: TextStyle(fontSize: 11, color: Colors.green[800])),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(fish.scientificName, style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey)),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: Colors.blue[100], borderRadius: BorderRadius.circular(10)),
+                          child: Text(fish.habitat, style: TextStyle(fontSize: 10, color: Colors.blue[800], fontWeight: FontWeight.w500)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: Colors.grey[400]),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNoResults() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(_statusMessage, style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
+        ],
+      ),
+    );
   }
 }

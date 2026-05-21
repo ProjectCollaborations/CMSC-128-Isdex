@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:tflite_plus/tflite_plus.dart';
 import 'package:image/image.dart' as img;
 import '../../models/fish.dart';
+import 'dart:math';
 
 class FishImageSearchScreen extends StatefulWidget {
   final List<Fish> allSpecies;
@@ -30,48 +31,151 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   static const int _inputSize = 224;
   static const int _outputSize = 1001; // ImageNet output classes
 
-  // Map ImageNet class names to your fish species
-  final Map<String, List<String>> _synonymMap = {
+  // Expanded mapping from ImageNet keywords to your fish species.
+  // Keys are lowercase keywords (often singular), values are lists of exact fish common names.
+  final Map<String, List<String>> _keywordToFish = {
+    // Tuna family
     'tuna': ['Yellowfin Tuna', 'Tuna'],
-    'milkfish': ['Milkfish', 'Bangus'],
-    'tilapia': ['Nile Tilapia', 'Tilapia'],
-    'catfish': ['Asian Catfish', 'Manila Catfish', 'Catfish'],
-    'carp': ['Common Carp', 'Carp'],
+    'yellowfin': ['Yellowfin Tuna'],
+
+    // Snappers
+    'snapper': ['Red Snapper', 'Gray Snapper'],
+    'red snapper': ['Red Snapper'],
+    'gray snapper': ['Gray Snapper'],
+
+    // Groupers
     'grouper': ['Leopard Coral Grouper', 'Grouper'],
-    'snapper': ['Red Snapper', 'Snapper'],
-    'mackerel': ['Long-jawed Mackerel', 'Mackerel'],
-    'sardine': ['Goldstripe Sardinella', 'Sardine'],
-    'puffer': ['Pufferfish', 'Puffer'],
-    'parrotfish': ['Parrotfish'],
-    'surgeonfish': ['Surgeonfish'],
-    'butterflyfish': ['Butterflyfish'],
-    'eel': ['Eel'],
+    'leopard coral grouper': ['Leopard Coral Grouper'],
+
+    // Mackerels & Scads
+    'mackerel': ['Long-jawed Mackerel', 'Mackerel Scad', 'Mackerel'],
+    'long-jawed mackerel': ['Long-jawed Mackerel'],
+    'scad': ['Mackerel Scad'],
+
+    // Carps
+    'carp': ['Common Carp', 'Carp'],
+    'common carp': ['Common Carp'],
+
+    // Catfish
+    'catfish': ['Manila Catfish', 'Catfish'],
+    'manila catfish': ['Manila Catfish'],
+
+    // Barracuda
     'barracuda': ['Barracuda'],
-    'jack': ['Jack', 'Trevally'],
-    'seabass': ['Asian Seabass', 'Barramundi'],
-    'bream': ['Threadfin Bream'],
-    'emperor': ['Emperor'],
-    'goatfish': ['Goatfish'],
-    'rabbitfish': ['Rabbit Fish'],
-    'moonfish': ['Moonfish'],
-    'ribbonfish': ['Ribbonfish'],
-    'pomfret': ['Pomfret'],
-    'seahorse': ['Seahorse'],
-    'mudfish': ['Mudfish', 'Striped Snakehead'],
-    'goby': ['White Goby'],
-    'perch': ['Silver Perch', 'Climbing Perch'],
-    'gourami': ['Giant Gourami'],
-    'tarpon': ['Indo-Pacific Tarpon'],
-    'dolphinfish': ['Dolphinfish'],
-    'salmon': ['Threadfin Salmon'],
-    'bigeye': ['Red Bigeye'],
-    'scat': ['Spotted Scat'],
-    'halfbeak': ['Halfbeak'],
-    'needlefish': ['Needlefish'],
-    'flyingfish': ['Flying Fish'],
-    'seadragon': ['Sea Dragon'],
+
+    // Butterflyfish
+    'butterflyfish': ['Butterflyfish'],
+    'butterfly fish': ['Butterflyfish'],
+
+    // Eel
+    'eel': ['Eel'],
+
+    // Parrotfish
+    'parrotfish': ['Parrotfish'],
+    'parrot fish': ['Parrotfish'],
+
+    // Surgeonfish
+    'surgeonfish': ['Surgeonfish'],
+    'surgeon fish': ['Surgeonfish'],
+
+    // Pufferfish
+    'pufferfish': ['Pufferfish'],
+    'puffer': ['Pufferfish'],
+
+    // Porcupinefish
     'porcupinefish': ['Porcupinefish'],
+    'porcupine fish': ['Porcupinefish'],
+
+    // Boxfish
     'boxfish': ['Boxfish'],
+    'box fish': ['Boxfish'],
+
+    // Seahorse
+    'seahorse': ['Seahorse'],
+
+    // Sea Dragon
+    'sea dragon': ['Sea Dragon'],
+    'seadragon': ['Sea Dragon'],
+
+    // Jacks & Trevally
+    'jack': ['Jack', 'Trevally'],
+    'trevally': ['Trevally'],
+    'crevalle': ['Jack'],
+
+    // Seabass
+    'seabass': ['Asian Seabass'],
+    'asian seabass': ['Asian Seabass'],
+    'barramundi': ['Asian Seabass'],
+
+    // Bream
+    'bream': ['Threadfin Bream'],
+    'threadfin bream': ['Threadfin Bream'],
+
+    // Emperor
+    'emperor': ['Emperor'],
+    'emperor fish': ['Emperor'],
+
+    // Goatfish
+    'goatfish': ['Goatfish'],
+    'goat fish': ['Goatfish'],
+
+    // Rabbitfish
+    'rabbitfish': ['Rabbit Fish'],
+    'rabbit fish': ['Rabbit Fish'],
+
+    // Moonfish
+    'moonfish': ['Moonfish'],
+    'moon fish': ['Moonfish'],
+
+    // Ribbonfish
+    'ribbonfish': ['Ribbonfish'],
+    'ribbon fish': ['Ribbonfish'],
+
+    // Pomfret
+    'pomfret': ['Pomfret'],
+
+    // Dolphinfish (Mahi-Mahi)
+    'dolphinfish': ['Dolphinfish'],
+    'mahi': ['Dolphinfish'],
+
+    // Salmon
+    'salmon': ['Threadfin Salmon'],
+    'threadfin salmon': ['Threadfin Salmon'],
+
+    // Bigeye
+    'bigeye': ['Red Bigeye'],
+    'red bigeye': ['Red Bigeye'],
+
+    // Scat
+    'scat': ['Spotted Scat'],
+    'spotted scat': ['Spotted Scat'],
+
+    // Halfbeak
+    'halfbeak': ['Halfbeak'],
+    'half beak': ['Halfbeak'],
+
+    // Needlefish
+    'needlefish': ['Needlefish'],
+    'needle fish': ['Needlefish'],
+
+    // Flying fish
+    'flying fish': ['Flying Fish'],
+    'flyingfish': ['Flying Fish'],
+
+    // Wrasse
+    'wrasse': ['Wrasse'],
+
+    // Sweetlip
+    'sweetlip': ['Sweetlip'],
+
+    // Damselfish
+    'damselfish': ['Damselfish'],
+    'damsel fish': ['Damselfish'],
+
+    // Goldstripe Sardinella
+    'sardinella': ['Goldstripe Sardinella'],
+    'goldstripe sardinella': ['Goldstripe Sardinella'],
+    'sardine': ['Goldstripe Sardinella'],
   };
 
   @override
@@ -80,12 +184,16 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     _loadModel();
   }
 
+  // --------------------------------------------------------------
+  // Model loading
+  // --------------------------------------------------------------
   Future<void> _loadModel() async {
     setState(() => _isLoading = true);
     try {
-      _interpreter = await Interpreter.fromAsset('assets/models/1.tflite');
-      final labelString = await rootBundle.loadString('assets/models/labels.txt');
-      _imagenetLabels = labelString.split('\n')
+      _interpreter = await Interpreter.fromAsset('assets/models/model (1).tflite');
+      final labelString = await rootBundle.loadString('assets/models/labels (1).txt');
+      _imagenetLabels = labelString
+          .split('\n')
           .map((l) => l.trim())
           .where((l) => l.isNotEmpty)
           .toList();
@@ -103,6 +211,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
   }
 
+  // --------------------------------------------------------------
+  // Image picker
+  // --------------------------------------------------------------
   Future<void> _pickImage(ImageSource source) async {
     if (!_isModelReady) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,7 +225,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: source,
-      imageQuality: 100,
+      imageQuality: 90,
       maxWidth: 1024,
       maxHeight: 1024,
     );
@@ -132,11 +243,15 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     await _classifyImage(imageFile);
   }
 
+  // --------------------------------------------------------------
+  // Image preprocessing (224x224, RGB normalized to [-1, 1])
+  // --------------------------------------------------------------
   Future<Float32List> _preprocessImage(File imageFile) async {
     final bytes = await imageFile.readAsBytes();
     img.Image? image = img.decodeImage(bytes);
     if (image == null) throw Exception('Failed to decode image');
 
+    // Resize keeping aspect ratio, then center crop to 224x224
     final scale = _inputSize / (image.width < image.height ? image.width : image.height);
     int newWidth = (image.width * scale).round();
     int newHeight = (image.height * scale).round();
@@ -146,6 +261,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     final cropY = (image.height - _inputSize) ~/ 2;
     image = img.copyCrop(image, x: cropX, y: cropY, width: _inputSize, height: _inputSize);
 
+    // Normalize pixel values to [-1, 1]
     final input = Float32List(1 * _inputSize * _inputSize * 3);
     int idx = 0;
     for (int y = 0; y < _inputSize; y++) {
@@ -159,33 +275,52 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     return input;
   }
 
+  // --------------------------------------------------------------
+  // Run inference and map results to local fish
+  // --------------------------------------------------------------
   Future<void> _classifyImage(File imageFile) async {
     if (_interpreter == null) return;
 
     try {
+      // 1. Preprocess image
       final flatInput = await _preprocessImage(imageFile);
-      final input4D = List.generate(1, (_) => List.generate(_inputSize, (_) => List.generate(_inputSize, (_) => List.filled(3, 0.0))));
+      // Reshape to [1, 224, 224, 3] as expected by the model
+      final input = List.generate(1, (_) => List.generate(_inputSize, (_) => List.generate(_inputSize, (_) => List.filled(3, 0.0))));
       int idx = 0;
       for (int h = 0; h < _inputSize; h++) {
         for (int w = 0; w < _inputSize; w++) {
           for (int c = 0; c < 3; c++) {
-            input4D[0][h][w][c] = flatInput[idx++];
+            input[0][h][w][c] = flatInput[idx++];
           }
         }
       }
 
-      final output = List.generate(1, (_) => List.filled(_outputSize, 0.0));
-      _interpreter!.run(input4D, output);
+      // 2. Create output tensor (1001 classes)
+      final output = List.filled(1 * 50, 0.0).reshape([1, 50]);
 
-      final rawPredictions = _getTopPredictions(output[0], 10);
-      final mappedFish = _mapToLocalFish(rawPredictions);
-      final matchedFish = mappedFish.map((e) => e.$1).toList();
-      final displayLabels = mappedFish.map((e) => '${e.$1.commonName} (${(e.$2 * 100).toStringAsFixed(0)}%)').toList();
+      // 3. Run inference
+      _interpreter!.run(input, output);
 
+      // 4. Convert raw logits to probabilities (softmax)
+      final probabilities = _softmax(output[0]);
+
+      // 5. Get top 10 predictions
+      final topPredictions = _getTopPredictions(probabilities, 10);
+
+      // 6. Map ImageNet labels to your fish species
+      final matched = _mapToLocalFish(topPredictions);
+
+      // 7. Update UI
       setState(() {
-        _detectedLabels = displayLabels;
-        _matchedFish = matchedFish;
-        _statusMessage = matchedFish.isEmpty ? 'No matching fish found. Try manual search.' : '';
+        if (matched.isEmpty) {
+          _statusMessage = 'No matching fish found. Try manual search.';
+          _matchedFish = [];
+          _detectedLabels = [];
+        } else {
+          _matchedFish = matched.map((e) => e.$1).toList();
+          _detectedLabels = matched.map((e) => '${e.$1.commonName} (${(e.$2 * 100).toStringAsFixed(1)}%)').toList();
+          _statusMessage = '';
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -197,60 +332,77 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
   }
 
+  // Softmax conversion
+  List<double> _softmax(List<double> logits) {
+    final maxLogit = logits.reduce((a, b) => a > b ? a : b);
+    final expValues = logits.map((x) => exp(x - maxLogit)).toList();
+    final sumExp = expValues.reduce((a, b) => a + b);
+    return expValues.map<double>((x) => x / sumExp).toList();
+  }
+  // Get top-K indices and labels
   List<(String, double)> _getTopPredictions(List<double> probabilities, int topK) {
     final indices = List.generate(probabilities.length, (i) => i);
     indices.sort((a, b) => probabilities[b].compareTo(probabilities[a]));
     final result = <(String, double)>[];
     for (int i = 0; i < topK && i < indices.length; i++) {
       final idx = indices[i];
-      if (idx < _imagenetLabels.length) {
+      if (idx < _imagenetLabels.length && probabilities[idx] > 0.01) {
         result.add((_imagenetLabels[idx], probabilities[idx]));
       }
     }
     return result;
   }
 
-  List<(Fish, double)> _mapToLocalFish(List<(String, double)> imagenetPredictions) {
+  // Map ImageNet labels to your fish list using keyword matching
+  List<(Fish, double)> _mapToLocalFish(List<(String, double)> predictions) {
     final Map<Fish, double> scoreMap = {};
 
-    for (var pred in imagenetPredictions) {
-      final label = pred.$1.toLowerCase();
+    for (var pred in predictions) {
+      final imagenetLabel = pred.$1.toLowerCase();
       final confidence = pred.$2;
 
-      List<String> possibleFishNames = [];
-      for (var entry in _synonymMap.entries) {
-        if (label.contains(entry.key) || entry.key.contains(label)) {
-          possibleFishNames.addAll(entry.value);
+      // Find which fish keywords are contained in the ImageNet label
+      Set<String> matchedFishNames = {};
+      for (var entry in _keywordToFish.entries) {
+        final keyword = entry.key.toLowerCase();
+        if (imagenetLabel.contains(keyword) || keyword.contains(imagenetLabel)) {
+          matchedFishNames.addAll(entry.value);
         }
       }
-      possibleFishNames.add(label);
 
-      for (var fish in widget.allSpecies) {
-        final common = fish.commonName.toLowerCase();
-        final scientific = fish.scientificName.toLowerCase();
-        final local = fish.localName.toLowerCase();
-
-        for (var name in possibleFishNames) {
-          final lowerName = name.toLowerCase();
-          if (common == lowerName ||
-              scientific == lowerName ||
-              local == lowerName ||
-              common.contains(lowerName) ||
-              scientific.contains(lowerName) ||
-              local.contains(lowerName)) {
-            final existingScore = scoreMap[fish] ?? 0.0;
-            scoreMap[fish] = existingScore + confidence;
-            break;
+      // Also try to match directly by splitting the label (e.g., "tuna, yellowfin")
+      final words = imagenetLabel.split(RegExp(r'[ ,_-]+'));
+      for (var word in words) {
+        if (word.length < 3) continue;
+        for (var entry in _keywordToFish.entries) {
+          if (entry.key.contains(word) || word.contains(entry.key)) {
+            matchedFishNames.addAll(entry.value);
           }
+        }
+      }
+
+      // Now assign confidence to actual fish objects
+      for (var fish in widget.allSpecies) {
+        if (matchedFishNames.contains(fish.commonName)) {
+          scoreMap[fish] = (scoreMap[fish] ?? 0.0) + confidence;
         }
       }
     }
 
+    // Sort by total confidence
     final matches = scoreMap.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    return matches.map((e) => (e.key, e.value)).toList();
+
+    // Normalize scores to [0,1] relative to the highest score
+    final maxScore = matches.isNotEmpty ? matches.first.value : 1.0;
+    return matches
+        .map((e) => (e.key, (e.value / maxScore).clamp(0.0, 1.0)))
+        .toList();
   }
 
+  // --------------------------------------------------------------
+  // Manual search
+  // --------------------------------------------------------------
   void _performManualSearch() {
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) {
@@ -261,11 +413,12 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
 
     setState(() => _isLoading = true);
+    // Simulate async search (could be instant but we add a small delay for UX)
     Future.delayed(const Duration(milliseconds: 100), () {
       final matches = widget.allSpecies.where((fish) {
         return fish.commonName.toLowerCase().contains(query) ||
-               fish.scientificName.toLowerCase().contains(query) ||
-               fish.localName.toLowerCase().contains(query);
+            fish.scientificName.toLowerCase().contains(query) ||
+            fish.localName.toLowerCase().contains(query);
       }).toList();
       if (mounted) {
         setState(() {
@@ -289,7 +442,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     super.dispose();
   }
 
-  // ---------- UI Methods (fully implemented) ----------
+  // --------------------------------------------------------------
+  // UI BUILD (unchanged, but kept for completeness)
+  // --------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -573,7 +728,17 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(fish.commonName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Row(
+                          children: [
+                            Expanded(child: Text(fish.commonName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                            if (i < _detectedLabels.length)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(8)),
+                                child: Text(_detectedLabels[i], style: TextStyle(fontSize: 11, color: Colors.green[800])),
+                              ),
+                          ],
+                        ),
                         const SizedBox(height: 4),
                         Text(fish.scientificName, style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey)),
                         const SizedBox(height: 4),
