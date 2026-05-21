@@ -114,4 +114,24 @@ class CommunityRepository {
   Future<void> deleteComment(String postId, String commentId) async {
     await _db.child(FirebaseNodes.postCommentById(postId, commentId)).remove();
   }
+
+  Future<void> dismissReport(String postId) async {
+    await _db.child(FirebaseNodes.communityPostById(postId))
+        .update({'isReported': false});
+  }
+
+  Stream<List<CommunityPost>> watchReportedPosts() {
+    return _db.child(FirebaseNodes.communityPosts).onValue.map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) return <CommunityPost>[];
+      final map = event.snapshot.value as Map<dynamic, dynamic>;
+      return map.entries
+          .map((e) => CommunityPost.fromMap(
+                e.key.toString(),
+                Map<dynamic, dynamic>.from(e.value as Map),
+              ))
+          .where((p) => p.isReported && p.status != 'archived')
+          .toList()
+            ..sort((a, b) => b.timePosted.compareTo(a.timePosted));
+    });
+  }
 }

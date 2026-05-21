@@ -54,4 +54,24 @@ class FishRepository {
       await _db.child(FirebaseNodes.fishArchiveById(id)).remove();
     }
   }
+
+  Stream<List<Fish>> watchArchive() {
+    return _db.child(FirebaseNodes.fishArchive).onValue.map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) return <Fish>[];
+      final map = event.snapshot.value as Map<dynamic, dynamic>;
+      return map.entries
+          .map((e) => Fish.fromMap(
+                e.key.toString(),
+                Map<dynamic, dynamic>.from(e.value as Map),
+              ))
+          .toList();
+    });
+  }
+
+  Future<void> hardDelete(String id, {bool fromArchive = false}) async {
+    final node = fromArchive
+        ? FirebaseNodes.fishArchiveById(id)
+        : FirebaseNodes.fishById(id);
+    await _db.child(node).remove();
+  }
 }

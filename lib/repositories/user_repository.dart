@@ -21,4 +21,18 @@ class UserRepository {
     final snap = await _db.child(FirebaseNodes.emailKey(email)).get();
     return snap.exists && snap.value != null;
   }
+
+  Stream<List<AppUser>> watchAll() {
+    return _db.child(FirebaseNodes.users).onValue.map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) return <AppUser>[];
+      final map = event.snapshot.value as Map<dynamic, dynamic>;
+      return map.entries
+          .map((e) => AppUser.fromMap(
+                e.key.toString(),
+                Map<dynamic, dynamic>.from(e.value as Map),
+              ))
+          .toList()
+            ..sort((a, b) => a.role.compareTo(b.role));
+    });
+  }
 }
