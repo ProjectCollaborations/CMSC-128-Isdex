@@ -18,6 +18,7 @@ class FakeCommunityRepo {
   String? lastUid;
   String? lastCaption;
   String? lastImageBase64;
+  bool nextToggleResult = true;
 
   void emitPosts(List<CommunityPost> posts) {
     _postsController.add(posts);
@@ -29,7 +30,8 @@ class FakeCommunityRepo {
 
   Stream<List<CommunityPost>> watchPosts() => _postsController.stream;
 
-  Stream<List<Comment>> watchComments(String postId) => _commentsController.stream;
+  Stream<List<Comment>> watchComments(String postId) =>
+      _commentsController.stream;
 
   Future<void> addPost({
     required String uid,
@@ -43,10 +45,11 @@ class FakeCommunityRepo {
     lastImageBase64 = imageBase64;
   }
 
-  Future<void> toggleLike(String postId, String uid) async {
+  Future<bool> toggleLike(String postId, String uid) async {
     toggleLikeCalled = true;
     lastPostId = postId;
     lastUid = uid;
+    return nextToggleResult;
   }
 
   Future<bool> isLikedBy(String postId, String uid) async => false;
@@ -102,8 +105,18 @@ void main() {
       vm = CommunityViewModel(
         watchPosts: () => fakeRepo.watchPosts(),
         watchComments: (postId) => fakeRepo.watchComments(postId),
-        addPost: ({required uid, required username, required caption, required imageBase64}) =>
-            fakeRepo.addPost(uid: uid, username: username, caption: caption, imageBase64: imageBase64),
+        addPost:
+            ({
+              required uid,
+              required username,
+              required caption,
+              required imageBase64,
+            }) => fakeRepo.addPost(
+              uid: uid,
+              username: username,
+              caption: caption,
+              imageBase64: imageBase64,
+            ),
         toggleLike: (postId, uid) => fakeRepo.toggleLike(postId, uid),
         isLikedBy: (postId, uid) => fakeRepo.isLikedBy(postId, uid),
         reportPost: (postId) => fakeRepo.reportPost(postId),
@@ -136,8 +149,20 @@ void main() {
       fakeRepo.emitPosts(testPosts);
       await Future.delayed(const Duration(milliseconds: 50));
       fakeRepo.emitComments('1', [
-        Comment(id: 'c1', uid: 'u1', username: 'U1', text: 'Nice', timePosted: 100),
-        Comment(id: 'c2', uid: 'u2', username: 'U2', text: 'Great', timePosted: 200),
+        Comment(
+          id: 'c1',
+          uid: 'u1',
+          username: 'U1',
+          text: 'Nice',
+          timePosted: 100,
+        ),
+        Comment(
+          id: 'c2',
+          uid: 'u2',
+          username: 'U2',
+          text: 'Great',
+          timePosted: 200,
+        ),
       ]);
       await Future.delayed(const Duration(milliseconds: 50));
       expect(vm.commentCounts['1'], 2);
@@ -146,13 +171,17 @@ void main() {
     test('toggleLike calls repository and updates likedPostIds', () async {
       fakeRepo.emitPosts(testPosts);
       await Future.delayed(const Duration(milliseconds: 50));
-      vm.toggleLike('1');
+      await vm.toggleLike('1');
       expect(fakeRepo.toggleLikeCalled, isTrue);
       expect(fakeRepo.lastPostId, '1');
+      expect(vm.likedPostIds, {'1'});
     });
 
     test('addPost calls repository with correct params', () async {
-      await vm.addPost(caption: 'My post', imageBase64: 'data:image/png;base64,abc');
+      await vm.addPost(
+        caption: 'My post',
+        imageBase64: 'data:image/png;base64,abc',
+      );
       expect(fakeRepo.addPostCalled, isTrue);
       expect(fakeRepo.lastCaption, 'My post');
       expect(fakeRepo.lastImageBase64, 'data:image/png;base64,abc');
@@ -165,20 +194,33 @@ void main() {
       expect(fakeRepo.lastPostId, '1');
     });
 
-    test('deletePost calls repository and cleans up comment subscription', () async {
-      fakeRepo.emitPosts(testPosts);
-      await Future.delayed(const Duration(milliseconds: 50));
-      await vm.deletePost('1');
-      expect(fakeRepo.deletePostCalled, isTrue);
-      expect(fakeRepo.lastPostId, '1');
-    });
+    test(
+      'deletePost calls repository and cleans up comment subscription',
+      () async {
+        fakeRepo.emitPosts(testPosts);
+        await Future.delayed(const Duration(milliseconds: 50));
+        await vm.deletePost('1');
+        expect(fakeRepo.deletePostCalled, isTrue);
+        expect(fakeRepo.lastPostId, '1');
+      },
+    );
 
     test('currentUserId returns null when not logged in', () {
       final vmNoUser = CommunityViewModel(
         watchPosts: () => fakeRepo.watchPosts(),
         watchComments: (postId) => fakeRepo.watchComments(postId),
-        addPost: ({required uid, required username, required caption, required imageBase64}) =>
-            fakeRepo.addPost(uid: uid, username: username, caption: caption, imageBase64: imageBase64),
+        addPost:
+            ({
+              required uid,
+              required username,
+              required caption,
+              required imageBase64,
+            }) => fakeRepo.addPost(
+              uid: uid,
+              username: username,
+              caption: caption,
+              imageBase64: imageBase64,
+            ),
         toggleLike: (postId, uid) => fakeRepo.toggleLike(postId, uid),
         isLikedBy: (postId, uid) => fakeRepo.isLikedBy(postId, uid),
         reportPost: (postId) => fakeRepo.reportPost(postId),

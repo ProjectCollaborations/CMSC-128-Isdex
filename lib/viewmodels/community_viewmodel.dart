@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/community_post.dart';
 import '../models/comment.dart';
-import 'auth_viewmodel.dart';
 
 typedef PostsStreamFactory = Stream<List<CommunityPost>> Function();
 typedef CommentsStreamFactory = Stream<List<Comment>> Function(String postId);
@@ -30,25 +29,16 @@ class CommunityViewModel extends ChangeNotifier {
   final DeletePostFn _deletePost;
   final CurrentUserIdFn _currentUserId;
   final CurrentUserDisplayFn _currentUserDisplay;
-  final AuthViewModel _authViewModel;
 
   List<CommunityPost> _posts = [];
   final Map<String, int> _commentCounts = {};
   Set<String> _likedPostIds = {};
   bool _isLoading = true;
-  String? _activeUserId;
-  int _likedStateRequestId = 0;
   bool _isDisposed = false;
-
-  // ──────────────────────────────────────────────────────────────
-  // Race condition fix #1: Generation counter with stale detection
-  // ──────────────────────────────────────────────────────────────
-  int _refreshGeneration = 0;
   String? _lastKnownUserId;
-  
-  // Track in-flight operations to prevent duplicates
+  int _refreshGeneration = 0;
+
   final Set<String> _pendingLikeOperations = {};
-  final Set<String> _pendingRefreshOperations = {};
 
   List<CommunityPost> get posts => _posts;
   Map<String, int> get commentCounts => _commentCounts;
@@ -61,7 +51,6 @@ class CommunityViewModel extends ChangeNotifier {
   final Map<String, StreamSubscription<List<Comment>>> _commentSubs = {};
 
   CommunityViewModel({
-    required AuthViewModel authViewModel,
     required PostsStreamFactory watchPosts,
     required CommentsStreamFactory watchComments,
     required AddPostFn addPost,
@@ -71,142 +60,39 @@ class CommunityViewModel extends ChangeNotifier {
     required DeletePostFn deletePost,
     required CurrentUserIdFn currentUserId,
     required CurrentUserDisplayFn currentUserDisplay,
-  })  : _authViewModel = authViewModel,
-        _watchPosts = watchPosts,
-        _watchComments = watchComments,
-        _addPost = addPost,
-        _toggleLike = toggleLike,
-        _isLikedBy = isLikedBy,
-        _reportPost = reportPost,
-        _deletePost = deletePost,
-        _currentUserId = currentUserId,
-        _currentUserDisplay = currentUserDisplay {
-    _authViewModel.addListener(_onAuthChanged);
+  }) : _watchPosts = watchPosts,
+       _watchComments = watchComments,
+       _addPost = addPost,
+       _toggleLike = toggleLike,
+       _isLikedBy = isLikedBy,
+       _reportPost = reportPost,
+       _deletePost = deletePost,
+       _currentUserId = currentUserId,
+       _currentUserDisplay = currentUserDisplay {
     _init();
   }
 
   void _init() {
     _postsSub = _watchPosts().listen((posts) {
-      // Race condition fix: Check if still relevant before updating
-      if (!_isRefreshStillValid()) return;
-      
       _posts = posts;
       _isLoading = false;
       _updateCommentSubscriptions(posts);
-      refreshLikedState(); // Will check staleness internally
-      notifyListeners();
+      _refreshLikedState();
+      _notifyIfActive();
     });
   }
 
-  void _onAuthChanged() {
-    final uid = _authViewModel.user?.uid;
-    _forceRefreshLikedState(uid);
-  }
+  void handleCurrentUserChanged(String? uid) {
+    if (_lastKnownUserId == uid) return;
 
-  // ──────────────────────────────────────────────────────────────
-  // Core race-protected refresh logic
-  // ──────────────────────────────────────────────────────────────
-
-  bool _isRefreshStillValid() {
-    // If we've advanced generations during this async operation, discard
-    return _refreshGeneration == _lastKnownGeneration;
-  }
-  
-  int _lastKnownGeneration = 0;
-
-  Future<void> _forceRefreshLikedState(String? uid) async {
-    // Race condition fix: Cancel any pending refresh with same operation ID
-    final operationId = 'refresh_${DateTime.now().millisecondsSinceEpoch}';
-    if (_pendingRefreshOperations.contains('refresh_active')) {
-      // Previous refresh still in flight; let it complete and we'll run another
-      // after a short delay to avoid stampede
-      await Future.delayed(const Duration(milliseconds: 50));
-      if (_pendingRefreshOperations.contains('refresh_active')) {
-        // Still busy; schedule a retry
-        Future.microtask(() => _forceRefreshLikedState(uid));
-        return;
-      }
-    }
-    
-    _pendingRefreshOperations.add('refresh_active');
-    
-    final generation = ++_refreshGeneration;
-    _lastKnownGeneration = generation;
     _lastKnownUserId = uid;
-    
-    // Clear immediately to prevent showing stale data
+    _refreshGeneration++;
     _likedPostIds = {};
-    notifyListeners();
-
-    if (uid == null || _posts.isEmpty) {
-      _pendingRefreshOperations.remove('refresh_active');
-      return;
-    }
-
-    try {
-      final results = await Future.wait(
-        _posts.map((p) => _isLikedBy(p.id, uid)),
-      );
-
-      // Race condition fix: Check generation hasn't changed during async wait
-      if (generation != _refreshGeneration) {
-        // Stale result — discard
-        _pendingRefreshOperations.remove('refresh_active');
-        return;
-      }
-
-      final liked = <String>{};
-      for (int i = 0; i < _posts.length; i++) {
-        if (results[i]) liked.add(_posts[i].id);
-      }
-      
-      // Final generation check before applying
-      if (generation == _refreshGeneration) {
-        _likedPostIds = liked;
-        notifyListeners();
-      }
-    } catch (e) {
-      // On error, keep current state (already cleared) but log
-      debugPrint('CommunityViewModel: refresh failed - $e');
-    } finally {
-      _pendingRefreshOperations.remove('refresh_active');
-    }
+    _notifyIfActive();
+    _refreshLikedState();
   }
 
-  Future<void> refreshLikedState() async {
-    final uid = _currentUserId();
-
-    if (uid != _lastKnownUserId) {
-      await _forceRefreshLikedState(uid);
-      return;
-    }
-
-    if (uid == null || _posts.isEmpty) return;
-
-    final generation = ++_refreshGeneration;
-    _lastKnownGeneration = generation;
-
-    try {
-      final results = await Future.wait(
-        _posts.map((p) => _isLikedBy(p.id, uid)),
-      );
-
-      // Race condition fix: Check generation hasn't changed
-      if (generation != _refreshGeneration) return;
-
-      final liked = <String>{};
-      for (int i = 0; i < _posts.length; i++) {
-        if (results[i]) liked.add(_posts[i].id);
-      }
-      
-      if (generation == _refreshGeneration) {
-        _likedPostIds = liked;
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('CommunityViewModel: refreshLikedState failed - $e');
-    }
-  }
+  Future<void> refreshLikedState() => _refreshLikedState();
 
   void _updateCommentSubscriptions(List<CommunityPost> posts) {
     final currentIds = _commentSubs.keys.toSet();
@@ -225,93 +111,83 @@ class CommunityViewModel extends ChangeNotifier {
     }
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Race-protected like toggle
-  // ──────────────────────────────────────────────────────────────
+  Future<void> _refreshLikedState() async {
+    final uid = _currentUserId();
+    if (_lastKnownUserId != uid) {
+      _lastKnownUserId = uid;
+      _likedPostIds = {};
+    }
+
+    final generation = ++_refreshGeneration;
+    final postIds = _posts.map((p) => p.id).toList(growable: false);
+
+    if (uid == null || postIds.isEmpty) {
+      _likedPostIds = {};
+      _notifyIfActive();
+      return;
+    }
+
+    try {
+      final results = await Future.wait(
+        postIds.map((postId) => _isLikedBy(postId, uid)),
+      );
+
+      if (generation != _refreshGeneration ||
+          uid != _currentUserId() ||
+          !_samePostIds(
+            postIds,
+            _posts.map((p) => p.id).toList(growable: false),
+          )) {
+        return;
+      }
+
+      final liked = <String>{};
+      for (int i = 0; i < postIds.length; i++) {
+        if (results[i]) liked.add(postIds[i]);
+      }
+      _likedPostIds = liked;
+      _notifyIfActive();
+    } catch (e) {
+      debugPrint('CommunityViewModel: refresh liked state failed - $e');
+    }
+  }
+
+  bool _samePostIds(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   Future<void> toggleLike(String postId) async {
     final uid = _currentUserId();
     if (uid == null) return;
-    
-    // Race condition fix: Prevent duplicate like operations on same post
-    final operationKey = 'like_${postId}_$uid';
-    if (_pendingLikeOperations.contains(operationKey)) {
-      // Operation already in flight for this post/user
-      return;
-    }
-    
-    _pendingLikeOperations.add(operationKey);
-    
-    // Capture current state before operation
-    final wasLiked = _likedPostIds.contains(postId);
-    final currentLikes = _posts.firstWhere(
-      (p) => p.id == postId,
-      orElse: () => CommunityPost(
-        id: postId,
-        uid: '',
-        username: '',
-        caption: '',
-        imageBase64: '',
-        likes: 0,
-        timePosted: 0,
-        isReported: false,
-        status: 'active',
-      ),
-    ).likes;
-    
-    // Race condition fix: Optimistic update with rollback capability
-    // Apply optimistic update
-    if (wasLiked) {
-      _likedPostIds.remove(postId);
-      _updatePostLikesLocally(postId, currentLikes - 1);
-    } else {
-      _likedPostIds.add(postId);
-      _updatePostLikesLocally(postId, currentLikes + 1);
-    }
-    notifyListeners();
 
+    final operationKey = '$postId:$uid';
+    if (_pendingLikeOperations.contains(operationKey)) return;
+
+    _pendingLikeOperations.add(operationKey);
     try {
-      // Capture the user ID at start of operation for verification
-      final startingUid = uid;
-      
-      await _toggleLike(postId, uid);
-      
-      // Race condition fix: Verify user hasn't changed during operation
-      if (startingUid != _currentUserId()) {
-        // User logged out/in during operation — force full refresh
-        _forceRefreshLikedState(_currentUserId());
+      final isLiked = await _toggleLike(postId, uid);
+      if (uid != _currentUserId()) {
+        handleCurrentUserChanged(_currentUserId());
         return;
       }
-      
-      // Verify the operation had the intended effect by checking current state
-      final isNowLiked = await _isLikedBy(postId, uid);
-      
-      if (isNowLiked != !wasLiked) {
-        // Our assumption about the operation result was wrong — force refresh
-        _forceRefreshLikedState(uid);
-      }
-    } catch (e) {
-      // Race condition fix: Rollback on error
-      if (wasLiked) {
-        _likedPostIds.add(postId);
-        _updatePostLikesLocally(postId, currentLikes);
+
+      final likedPostIds = Set<String>.from(_likedPostIds);
+      if (isLiked) {
+        likedPostIds.add(postId);
       } else {
-        _likedPostIds.remove(postId);
-        _updatePostLikesLocally(postId, currentLikes);
+        likedPostIds.remove(postId);
       }
-      notifyListeners();
-      
+      _likedPostIds = likedPostIds;
+      _notifyIfActive();
+    } catch (e) {
       debugPrint('CommunityViewModel: toggleLike failed - $e');
       rethrow;
     } finally {
       _pendingLikeOperations.remove(operationKey);
-    }
-  }
-  
-  void _updatePostLikesLocally(String postId, int newLikeCount) {
-    final index = _posts.indexWhere((p) => p.id == postId);
-    if (index != -1) {
-      _posts[index] = _posts[index].copyWith(likes: newLikeCount);
     }
   }
 
@@ -321,7 +197,7 @@ class CommunityViewModel extends ChangeNotifier {
   }) async {
     final uid = _currentUserId();
     if (uid == null) throw Exception('Must be logged in to create a post');
-    
+
     await _addPost(
       uid: uid,
       username: currentUserDisplay,
@@ -342,11 +218,18 @@ class CommunityViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    _authViewModel.removeListener(_onAuthChanged);
+    _isDisposed = true;
+    _refreshGeneration++;
     _postsSub?.cancel();
     for (final sub in _commentSubs.values) {
       sub.cancel();
     }
     super.dispose();
+  }
+
+  void _notifyIfActive() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
   }
 }

@@ -79,7 +79,6 @@ class _IsDexAppState extends State<IsDexApp> {
         ),
         ChangeNotifierProxyProvider<AuthViewModel, CommunityViewModel>(
           create: (ctx) => CommunityViewModel(
-            authViewModel: ctx.read<AuthViewModel>(),
             watchPosts: () => ctx.read<CommunityRepository>().watchPosts(),
             watchComments: (postId) =>
                 ctx.read<CommunityRepository>().watchComments(postId),
