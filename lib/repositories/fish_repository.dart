@@ -11,7 +11,7 @@ class FishRepository {
   Stream<List<Fish>> watchAll() {
     return _db.child(FirebaseNodes.fish).onValue.map((event) {
       if (!event.snapshot.exists || event.snapshot.value == null) {
-        return [];
+        return <Fish>[];
       }
       final map = event.snapshot.value as Map<dynamic, dynamic>;
       return map.entries.map((entry) {
