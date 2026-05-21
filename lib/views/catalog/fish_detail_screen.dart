@@ -202,9 +202,10 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
         _buildSectionHeader('Habitat'),
         const SizedBox(height: 8),
         Chip(
-          label: Text(fish.habitat, style: const TextStyle(fontSize: 12)),
-          backgroundColor: AppTheme.teal50,
-          side: const BorderSide(color: AppTheme.teal200),
+          label: Text(fish.habitat,
+              style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.navy500,
+          side: const BorderSide(color: AppTheme.navy500),
         ),
         const SizedBox(height: 24),
         _buildConservationStatusSection(fish, statusColor),
@@ -411,7 +412,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
         child: Text(label,
             style: TextStyle(
               color: isSelected ? Colors.white : AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               fontSize: 12,
             )),
       ),
