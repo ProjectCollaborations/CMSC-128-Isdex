@@ -270,9 +270,9 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
     _SightingLocationMode locationMode,
   ) async {
     final sightingVm = _getSightingVm(context);
-    final messenger = ScaffoldMessenger.of(context);
     String? selectedFishId;
     String? selectedFishName;
+    String? fishError;
     final notesController = TextEditingController();
     bool isAnonymous = false;
 
@@ -341,6 +341,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                       selectedFishId = sightingVm.fishList
                           .firstWhere((f) => f.commonName == selection)
                           .id;
+                      fishError = null;
                     });
                   },
                   fieldViewBuilder:
@@ -398,6 +399,20 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     );
                   },
                 ),
+                if (fishError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 14, color: AppTheme.error),
+                        const SizedBox(width: 4),
+                        Text(
+                          fishError!,
+                          style: TextStyle(fontSize: 12, color: AppTheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: notesController,
@@ -459,10 +474,7 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
             ElevatedButton(
               onPressed: () {
                 if (selectedFishId == null) {
-                  messenger.hideCurrentSnackBar();
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Please select a fish first.')),
-                  );
+                  setDialogState(() => fishError = 'Please select a fish first.');
                   return;
                 }
                 Navigator.pop(context, true);
