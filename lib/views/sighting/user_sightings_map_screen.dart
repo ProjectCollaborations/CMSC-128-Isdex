@@ -169,45 +169,120 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.my_location, size: 16, color: AppTheme.teal400),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text(
-                        'Using your current GPS location',
-                        style: TextStyle(fontSize: 13, color: AppTheme.teal400),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.teal400.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.my_location, size: 16, color: AppTheme.teal400),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Using your current GPS location',
+                          style: TextStyle(fontSize: 13, color: AppTheme.teal400),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Fish (common name)',
-                    style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 4),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedFishId,
-                  items: sightingVm.fishList.map((f) => DropdownMenuItem<String>(
-                    value: f.id,
-                    child: Text(f.commonName),
-                  )).toList(),
-                  onChanged: (value) {
-                    setDialogState(() {
-                      selectedFishId = value;
-                      selectedFishName = sightingVm.fishList
-                          .firstWhere((f) => f.id == value)
-                          .commonName;
-                    });
-                  },
-                  decoration: const InputDecoration(
-                    hintText: 'Select fish',
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                Text('Fish (common name)',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textPrimary,
+                        fontSize: 14)),
+                const SizedBox(height: 8),
+                Autocomplete<String>(
+                  optionsBuilder: (textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return sightingVm.fishList.map((f) => f.commonName);
+                    }
+                    return sightingVm.fishList
+                        .where((f) => f.commonName.toLowerCase().contains(
+                            textEditingValue.text.toLowerCase()))
+                        .map((f) => f.commonName);
+                  },
+                  onSelected: (selection) {
+                    setDialogState(() {
+                      selectedFishName = selection;
+                      selectedFishId = sightingVm.fishList
+                          .firstWhere((f) => f.commonName == selection)
+                          .id;
+                    });
+                  },
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onTapOutside: (_) => focusNode.unfocus(),
+                      decoration: InputDecoration(
+                        hintText: 'Search fish...',
+                        prefixIcon: const Icon(Icons.search,
+                            color: AppTheme.textSecondary),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.close,
+                              color: AppTheme.textSecondary),
+                          onPressed: () {
+                            controller.clear();
+                            focusNode.unfocus();
+                          },
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: AppTheme.navy500.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: AppTheme.teal400, width: 2),
+                        ),
+                      ),
+                    );
+                  },
+                  optionsViewBuilder:
+                      (context, onSelected, options) {
+                    return Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final name = options.elementAt(index);
+                            return ListTile(
+                              dense: true,
+                              title: Text(name),
+                              onTap: () => onSelected(name),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
+                  decoration: InputDecoration(
+                    hintText: 'Notes (optional)',
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                          color: AppTheme.navy500.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppTheme.teal400, width: 2),
+                    ),
                   ),
                   maxLines: 3,
                 ),
@@ -563,9 +638,33 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                 Marker(
                   point: _userLocation!,
                   width: 60,
-                  height: 60,
-                  child: const Icon(Icons.my_location,
-                      color: AppTheme.teal400, size: 38),
+                  height: 70,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.teal400,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 6),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: const Icon(Icons.my_location,
+                            color: Colors.white, size: 20),
+                      ),
+                      const Text(
+                        'You',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.teal400,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
