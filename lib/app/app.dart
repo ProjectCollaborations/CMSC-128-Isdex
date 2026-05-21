@@ -1,6 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/constants/app_theme.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/fish_repository.dart';
 import '../repositories/sighting_repository.dart';
@@ -79,7 +80,6 @@ class _IsDexAppState extends State<IsDexApp> {
         ),
         ChangeNotifierProxyProvider<AuthViewModel, CommunityViewModel>(
           create: (ctx) => CommunityViewModel(
-            authViewModel: ctx.read<AuthViewModel>(),
             watchPosts: () => ctx.read<CommunityRepository>().watchPosts(),
             watchComments: (postId) =>
                 ctx.read<CommunityRepository>().watchComments(postId),
@@ -117,6 +117,7 @@ class _IsDexAppState extends State<IsDexApp> {
       ],
       child: MaterialApp.router(
         title: 'IsDex',
+        theme: AppTheme.light,
         routerConfig: createRouter(_authVm),
         debugShowCheckedModeBanner: false,
       ),

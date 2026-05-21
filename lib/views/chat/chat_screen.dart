@@ -6,7 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
-import '../../screens/theme.dart';
+import '../../core/constants/app_theme.dart';
 import '../../viewmodels/chat_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../repositories/fish_repository.dart';
@@ -125,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
             child: const Text('Clear'),
           ),
         ],
@@ -145,7 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to clear chat: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.error,
             ),
           );
         }
@@ -327,7 +327,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(errorMsg),
-        backgroundColor: Colors.red,
+        backgroundColor: AppTheme.error,
         duration: const Duration(seconds: 6),
       ),
     );
@@ -340,14 +340,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return showModalBottomSheet<AiModelOption>(
       context: context,
-      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,38 +354,47 @@ class _ChatScreenState extends State<ChatScreen> {
                 const Text(
                   'Model quota reached',
                   style: TextStyle(
-                    color: kDarkNavy,
+                    color: AppTheme.navy900,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   '${_selectedModel.label} is currently unavailable. Choose another model to retry your message.',
                   style: TextStyle(
-                    color: kDarkNavy.withValues(alpha: 0.7),
+                    color: AppTheme.navy900.withValues(alpha: 0.7),
                     fontSize: 14,
-                    height: 1.35,
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 ...fallbackModels.map(
-                  (model) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.auto_awesome, color: kAccentBlue),
-                    title: Text(
-                      model.label,
-                      style: const TextStyle(
-                        color: kDarkNavy,
-                        fontWeight: FontWeight.w700,
+                  (model) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      tileColor: AppTheme.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      leading: const Icon(Icons.auto_awesome,
+                          color: AppTheme.teal400),
+                      title: Text(
+                        model.label,
+                        style: const TextStyle(
+                          color: AppTheme.navy900,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(model.description),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () => Navigator.pop(context, model),
                     ),
-                    subtitle: Text(model.description),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => Navigator.pop(context, model),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 SizedBox(
                   width: double.infinity,
                   child: TextButton(
@@ -418,21 +426,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatVm = context.watch<ChatViewModel>();
 
     return Scaffold(
-      backgroundColor: kBackground,
+      backgroundColor: AppTheme.surface,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: const Text(
-          'Isdex AI Assistant',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        backgroundColor: Colors.transparent,
-        foregroundColor: kDarkNavy,
-        elevation: 0,
-        centerTitle: true,
+        title: const Text('Isdex AI Assistant'),
         actions: [
           IconButton(
             onPressed: _isAITyping ? null : _clearChat,
-            icon: const Icon(Icons.delete_sweep_outlined, color: kDarkNavy),
+            icon: const Icon(Icons.delete_sweep_outlined),
             tooltip: 'Clear chat',
           ),
         ],
@@ -462,7 +463,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 child: chatVm.isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(color: kAccentBlue),
+                        child: CircularProgressIndicator(color: AppTheme.teal400),
                       )
                     : chatVm.messages.isEmpty
                         ? _buildEmptyState(userName)
@@ -502,13 +503,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       width: 12,
                       height: 12,
                       child:
-                          CircularProgressIndicator(strokeWidth: 2, color: kAccentBlue),
+                          CircularProgressIndicator(strokeWidth: 2, color: AppTheme.teal400),
                     ),
                     const SizedBox(width: 10),
                     const Text(
                       'AI is thinking...',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: AppTheme.textSecondary,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
                       ),
@@ -532,7 +533,7 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Text(
             'Hi, ${userName[0].toUpperCase()}${userName.substring(1)}!',
             style: const TextStyle(
-              color: kDarkNavy,
+              color: AppTheme.navy900,
               fontSize: 32,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -556,12 +557,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icon(
                   Icons.auto_awesome,
                   size: 64,
-                  color: kAccentBlue.withValues(alpha: 0.2),
+                  color: AppTheme.teal400.withValues(alpha: 0.2),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Ask me anything about Philippine fish!',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                  const Text(
+                    'Ask me anything about Philippine fish!',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
                 ),
               ],
             ),
@@ -585,24 +586,23 @@ class _ChatScreenState extends State<ChatScreen> {
         children: shortcuts.map((shortcut) {
           return Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: ActionChip(
-              onPressed: () =>
-                  _handleShortcut(shortcut['label'] as String),
-              label: Text(
-                shortcut['label'] as String,
-                style: const TextStyle(
-                  color: kDarkNavy,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              avatar: Icon(
-                shortcut['icon'] as IconData,
-                size: 16,
-                color: kAccentBlue,
-              ),
-              backgroundColor: Colors.white,
-              side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+              child: ActionChip(
+                  onPressed: () =>
+                      _handleShortcut(shortcut['label'] as String),
+                  label: Text(
+                    shortcut['label'] as String,
+                    style: const TextStyle(
+                      color: AppTheme.navy900,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  avatar: Icon(
+                    shortcut['icon'] as IconData,
+                    size: 16,
+                    color: AppTheme.teal400,
+                  ),
+                  side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -634,16 +634,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildModelStatus() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            border: Border.all(color: AppTheme.textSecondary.withValues(alpha: 0.2)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -651,13 +651,13 @@ class _ChatScreenState extends State<ChatScreen> {
               Icon(
                 Icons.auto_awesome,
                 size: 16,
-                color: _isAITyping ? Colors.grey : kAccentBlue,
+                color: _isAITyping ? AppTheme.textSecondary : AppTheme.teal400,
               ),
               const SizedBox(width: 8),
               Text(
                 'Model: ${_selectedModel.label}',
                 style: TextStyle(
-                  color: _isAITyping ? Colors.grey : kDarkNavy,
+                  color: _isAITyping ? AppTheme.textSecondary : AppTheme.navy900,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -693,7 +693,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Text(
                 _quotaNotice!,
                 style: const TextStyle(
-                  color: kDarkNavy,
+                  color: AppTheme.navy900,
                   fontSize: 13,
                   height: 1.3,
                   fontWeight: FontWeight.w600,
@@ -725,7 +725,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color:
-                  isUser ? kAccentBlue : Colors.grey.withValues(alpha: 0.1),
+                  isUser ? AppTheme.teal400 : AppTheme.surface,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(20),
                 topRight: const Radius.circular(20),
@@ -750,12 +750,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 : MarkdownBody(
                     data: content,
                     styleSheet: MarkdownStyleSheet(
-                      p: const TextStyle(color: kDarkNavy, fontSize: 15),
+                      p: const TextStyle(color: AppTheme.navy900, fontSize: 15),
                       strong: const TextStyle(
-                        color: kDarkNavy,
+                        color: AppTheme.navy900,
                         fontWeight: FontWeight.bold,
                       ),
-                      listBullet: const TextStyle(color: kAccentBlue),
+                      listBullet: const TextStyle(color: AppTheme.teal400),
                     ),
                   ),
           ),
@@ -783,7 +783,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Colors.white,
         border: Border(
           top: BorderSide(
-            color: Colors.grey.withValues(alpha: 0.15),
+            color: AppTheme.textSecondary.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
@@ -796,10 +796,10 @@ class _ChatScreenState extends State<ChatScreen> {
               constraints:
                   const BoxConstraints(minHeight: 44, maxHeight: 96),
               decoration: BoxDecoration(
-                color: kBackground,
+                color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: AppTheme.textSecondary.withValues(alpha: 0.1),
                 ),
               ),
               child: TextField(
@@ -809,11 +809,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 enabled: !_isAITyping,
                 maxLines: _lineCount,
                 minLines: 1,
-                style: const TextStyle(color: kDarkNavy),
+                style: const TextStyle(color: AppTheme.navy900),
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
                   hintStyle: TextStyle(
-                    color: Colors.grey.withValues(alpha: 0.6),
+                    color: AppTheme.textSecondary.withValues(alpha: 0.6),
                   ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
@@ -837,13 +837,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isAITyping
-                      ? Colors.grey.withValues(alpha: 0.2)
-                      : kAccentBlue,
+                      ? AppTheme.textSecondary.withValues(alpha: 0.2)
+                      : AppTheme.teal400,
                   shape: BoxShape.circle,
                   boxShadow: [
                     if (!_isAITyping)
                       BoxShadow(
-                        color: kAccentBlue.withValues(alpha: 0.3),
+                        color: AppTheme.teal400.withValues(alpha: 0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),

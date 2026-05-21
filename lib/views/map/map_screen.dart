@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants/app_theme.dart';
 import '../../viewmodels/map_viewmodel.dart';
 import '../../models/map_location.dart';
 import '../../repositories/map_repository.dart';
@@ -150,7 +151,7 @@ class _MapScreenState extends State<MapScreen> {
         },
         child: Column(
           children: [
-            const Icon(Icons.location_on, color: Colors.blue, size: 40),
+            const Icon(Icons.location_on, color: AppTheme.teal400, size: 40),
             if (label.isNotEmpty)
               Container(
                 padding:
@@ -229,7 +230,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.blue,
+                  color: AppTheme.teal400,
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: const [
@@ -245,7 +246,7 @@ class _MapScreenState extends State<MapScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  color: AppTheme.teal400,
                 ),
               ),
             ],
@@ -284,8 +285,6 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.fishName ?? 'Fish Species Map'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
       ),
       body: FlutterMap(
         mapController: _mapController,
@@ -304,7 +303,6 @@ class _MapScreenState extends State<MapScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _isLocating ? null : _goToMyLocation,
-        backgroundColor: Colors.blue,
         tooltip: 'Go to my location',
         child: _isLocating
             ? const SizedBox(

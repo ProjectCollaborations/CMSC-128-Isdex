@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
+import '../../core/constants/app_theme.dart';
+import '../../core/widgets/app_card.dart';
 import '../../models/fish.dart';
 
 class FishImageSearchScreen extends StatefulWidget {
@@ -216,9 +218,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search by Photo'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: Column(
         children: [
@@ -262,9 +261,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppTheme.surface),
       ),
       child: _imageFile != null
           ? ClipRRect(
@@ -278,16 +277,16 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
           : Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.camera_alt, size: 48, color: Colors.grey[400]),
+                Icon(Icons.camera_alt, size: 48, color: AppTheme.textSecondary),
                 const SizedBox(height: 8),
                 Text(
                   'Take or select a photo of a fish',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'ML Kit will analyze the image offline',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -304,12 +303,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 _isLoading ? null : () => _pickImage(ImageSource.camera),
             icon: const Icon(Icons.camera_alt),
             label: const Text('Camera'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -319,12 +312,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 _isLoading ? null : () => _pickImage(ImageSource.gallery),
             icon: const Icon(Icons.photo_library),
             label: const Text('Gallery'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
           ),
         ),
       ],
@@ -336,22 +323,22 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue[50],
+        color: AppTheme.teal50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue[200]!),
+        border: Border.all(color: AppTheme.teal200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, size: 16, color: Colors.blue[700]),
+              Icon(Icons.auto_awesome, size: 16, color: AppTheme.navy500),
               const SizedBox(width: 8),
               Text(
                 'ML Kit Detected:',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
+                  color: AppTheme.navy500,
                   fontSize: 12,
                 ),
               ),
@@ -368,11 +355,11 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: AppTheme.teal200),
                 ),
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: 12, color: Colors.blue[800]),
+                  style: TextStyle(fontSize: 12, color: AppTheme.navy700),
                 ),
               );
             }).toList(),
@@ -385,18 +372,18 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(child: Divider(color: Colors.grey[300])),
+        const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'OR',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: AppTheme.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
-        Expanded(child: Divider(color: Colors.grey[300])),
+        const Expanded(child: Divider()),
       ],
     );
   }
@@ -405,16 +392,16 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green[50],
+        color: AppTheme.teal50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green[200]!),
+        border: Border.all(color: AppTheme.teal200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.search, size: 20, color: Colors.green[700]),
+              Icon(Icons.search, size: 20, color: AppTheme.navy500),
               const SizedBox(width: 8),
               const Text(
                 'Manual Search',
@@ -423,9 +410,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Search by common name, scientific name, or local name:',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),
           Row(
@@ -434,12 +421,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 child: TextField(
                   controller: _searchController,
                   enabled: !_isLoading,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Enter fish name...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
+                    contentPadding: EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
@@ -450,14 +434,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
               const SizedBox(width: 12),
               ElevatedButton(
                 onPressed: _isLoading ? null : _performManualSearch,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
                 child: const Text('Search'),
               ),
             ],
@@ -485,7 +461,11 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(
         'Found ${_matchedFish.length} matching fish',
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          color: AppTheme.textPrimary,
+        ),
       ),
     );
   }
@@ -497,94 +477,86 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       itemCount: _matchedFish.length,
       itemBuilder: (context, i) {
         final fish = _matchedFish[i];
-        return Card(
+        return AppCard(
           margin: const EdgeInsets.only(bottom: 12),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: InkWell(
-            onTap: () => _navigateToFishDetail(fish),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: fish.imageUrl.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.asset(
-                              fish.imageUrl,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.set_meal,
-                                color: Colors.blue[300],
-                                size: 30,
-                              ),
-                            ),
-                          )
-                        : Icon(
+          padding: const EdgeInsets.all(12),
+          onTap: () => _navigateToFishDetail(fish),
+          child: Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: AppTheme.teal50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: fish.imageUrl.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          fish.imageUrl,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
                             Icons.set_meal,
-                            color: Colors.blue[300],
+                            color: AppTheme.teal200,
                             size: 30,
                           ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          fish.commonName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          fish.scientificName,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[100],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            fish.habitat,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.blue[800],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: Colors.grey[400]),
-                ],
+                      )
+                    : Icon(
+                        Icons.set_meal,
+                        color: AppTheme.teal200,
+                        size: 30,
+                      ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fish.commonName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      fish.scientificName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.teal50,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        fish.habitat,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.navy700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+            ],
           ),
         );
       },
@@ -596,11 +568,11 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+          const Icon(Icons.search_off, size: 64, color: AppTheme.textSecondary),
           const SizedBox(height: 16),
           Text(
             _statusMessage,
-            style: TextStyle(color: Colors.grey[600]),
+            style: const TextStyle(color: AppTheme.textSecondary),
             textAlign: TextAlign.center,
           ),
         ],

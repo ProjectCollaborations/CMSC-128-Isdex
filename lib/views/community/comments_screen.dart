@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_theme.dart';
 import '../../repositories/community_repository.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
@@ -26,7 +27,7 @@ class CommentsScreen extends StatelessWidget {
                   return const Center(
                     child: Text(
                       'No comments yet',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: AppTheme.textSecondary),
                     ),
                   );
                 }
@@ -43,7 +44,7 @@ class CommentsScreen extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: AppTheme.surface,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -52,7 +53,9 @@ class CommentsScreen extends StatelessWidget {
                           Expanded(
                             child: RichText(
                               text: TextSpan(
-                                style: const TextStyle(color: Colors.black),
+                                style: const TextStyle(
+                                  color: AppTheme.textPrimary,
+                                ),
                                 children: [
                                   TextSpan(
                                     text: '${comment.username} ',
@@ -78,7 +81,7 @@ class CommentsScreen extends StatelessWidget {
                                 child: Icon(
                                   Icons.more_vert,
                                   size: 18,
-                                  color: Colors.grey[600],
+                                  color: AppTheme.textSecondary,
                                 ),
                               ),
                             ),
@@ -132,13 +135,13 @@ class _CommentInputState extends State<_CommentInput> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   hintText: 'Write a comment...',
-                  border: OutlineInputBorder(),
+                  // border inherits from inputDecorationTheme
                 ),
               ),
             ),
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.send),
+              icon: const Icon(Icons.send, color: AppTheme.teal400),
               onPressed: () async {
                 if (user == null || controller.text.trim().isEmpty) return;
 
@@ -194,7 +197,7 @@ void _showDeleteCommentDialog(
           },
           child: const Text(
             'Delete',
-            style: TextStyle(color: Colors.red),
+            style: TextStyle(color: AppTheme.error),
           ),
         ),
       ],

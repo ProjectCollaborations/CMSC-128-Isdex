@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../viewmodels/fish_detail_viewmodel.dart';
 import '../../models/fish.dart';
 import '../../core/constants/app_theme.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/section_header.dart';
+import '../../core/widgets/info_row.dart';
 import '../../services/iucn_service.dart';
 
 class FishDetailScreen extends StatefulWidget {
@@ -115,11 +118,17 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
     final Color statusColor = _statusColor(_status);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.card,
+      appBar: AppBar(
+        title: const Text('Fish Information Page'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -128,28 +137,6 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => context.pop(),
-            icon: const Icon(Icons.arrow_back, color: Colors.blue),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.blue[50],
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            'Fish Information Page',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-        ],
       ),
     );
   }
@@ -186,7 +173,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
         const SizedBox(height: 8),
         Text(
           fish.sizeRange,
-          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+          style: TextStyle(fontSize: 14, color: AppTheme.textPrimary),
         ),
         const SizedBox(height: 24),
         _buildSectionHeader('Identifying Features'),
@@ -199,25 +186,26 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
                   children: [
                     Text('• ',
                         style:
-                            TextStyle(fontSize: 14, color: Colors.grey[700])),
+                            TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
                     Expanded(
                       child: Text(feature,
                           style:
-                              TextStyle(fontSize: 14, color: Colors.grey[700])),
+                              TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
                     ),
                   ],
                 ),
               ))
         else
           Text('No identifying features listed',
-              style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
         const SizedBox(height: 24),
         _buildSectionHeader('Habitat'),
         const SizedBox(height: 8),
         Chip(
-          label: Text(fish.habitat, style: const TextStyle(fontSize: 12)),
-          backgroundColor: Colors.blue[50],
-          side: const BorderSide(color: Colors.blue),
+          label: Text(fish.habitat,
+              style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.navy500,
+          side: const BorderSide(color: AppTheme.navy500),
         ),
         const SizedBox(height: 24),
         _buildConservationStatusSection(fish, statusColor),
@@ -225,7 +213,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
           _buildSectionHeader('Distribution'),
           const SizedBox(height: 8),
           Text(fish.distribution,
-              style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
           const SizedBox(height: 24),
         ],
       ],
@@ -240,7 +228,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
           width: double.infinity,
           margin: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.blue, width: 2),
+            border: Border.all(color: AppTheme.teal400, width: 2),
             borderRadius: BorderRadius.circular(12),
           ),
           clipBehavior: Clip.antiAlias,
@@ -277,7 +265,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.grey[400],
+        color: AppTheme.textSecondary,
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Row(
@@ -301,7 +289,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey[300]!),
       ),
@@ -313,7 +301,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
               child: CircularProgressIndicator(strokeWidth: 1.5)),
           const SizedBox(width: 10),
           Text('Loading conservation status\u2026',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
         ],
       ),
     );
@@ -418,13 +406,13 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue : Colors.grey[200],
+          color: isSelected ? AppTheme.teal400 : AppTheme.surface,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(label,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey[600],
-              fontWeight: FontWeight.w500,
+              color: isSelected ? Colors.white : AppTheme.textSecondary,
+              fontWeight: FontWeight.w600,
               fontSize: 12,
             )),
       ),
@@ -432,55 +420,29 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
   }
 
   Widget _buildInfoCard(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-          color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500)),
-          const SizedBox(height: 4),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold)),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Text(value,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-              width: 120,
-              child: Text(label,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500))),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w500)),
-          ),
-        ],
-      ),
-    );
+    return InfoRow(label: '$label:', value: value);
   }
 
   Widget _buildSectionHeader(String title) {
-    return Text(title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold));
+    return SectionHeader(title: title);
   }
 
   Widget _buildConservationStatusSection(Fish fish, Color color) {
@@ -494,7 +456,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey[300]!),
             ),
@@ -572,7 +534,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
                       'Population trend: ${_iucnData!.populationTrend}',
                       style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[700],
+                          color: AppTheme.textPrimary,
                           fontWeight: FontWeight.w500)),
                 ]),
               ],
@@ -583,7 +545,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
                 Text(fish.conservationDetails,
                     style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[700],
+                        color: AppTheme.textPrimary,
                         height: 1.5)),
               ],
               if (_iucnData?.iucnUrl != null) ...[
@@ -591,7 +553,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
                 Text(
                     'Source: IUCN Red List  \u2022  ${_iucnData!.iucnUrl}',
                     style: TextStyle(
-                        fontSize: 10, color: Colors.grey[400])),
+                        fontSize: 10, color: AppTheme.textSecondary)),
               ],
             ],
           ),
@@ -619,7 +581,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
         Text('Threat Level',
             style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey[600],
+                color: AppTheme.textSecondary,
                 fontWeight: FontWeight.w500)),
         const SizedBox(height: 6),
         Row(
@@ -650,7 +612,7 @@ class _FishDetailScreenState extends State<FishDetailScreen> {
                             : FontWeight.normal,
                         color: isActive
                             ? levelColor
-                            : Colors.grey[400],
+                            : AppTheme.textSecondary,
                       )),
                 ],
               ),

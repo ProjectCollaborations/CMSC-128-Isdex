@@ -34,7 +34,17 @@ GoRouter createRouter(AuthViewModel authVm) {
 
       if (isInitializing) return '/splash';
 
-      if (!loggedIn && !onAuthRoute) return '/login';
+      final location = state.matchedLocation;
+      final isPublic = location == '/' ||
+          location == '/login' ||
+          location == '/signup' ||
+          location == '/fish-search' ||
+          location == '/map' ||
+          location == '/sighting' ||
+          location == '/chat' ||
+          location.startsWith('/fish/');
+
+      if (!loggedIn && !isPublic) return '/login';
       if (loggedIn && onAuthRoute) return '/';
 
       return null;
