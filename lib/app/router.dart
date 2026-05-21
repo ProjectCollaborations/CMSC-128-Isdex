@@ -12,6 +12,7 @@ import '../views/auth/signup_screen.dart';
 import '../views/auth/splash_screen.dart';
 import '../views/community/community_screen.dart';
 import '../views/community/comments_screen.dart';
+import '../views/admin/admin_screen.dart';
 import '../views/chat/chat_screen.dart';
 
 GoRouter createRouter(AuthViewModel authVm) {
@@ -94,6 +95,10 @@ GoRouter createRouter(AuthViewModel authVm) {
       GoRoute(
         path: '/chat',
         builder: (context, state) => const ChatScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminScreen(),
       ),
     ],
   );

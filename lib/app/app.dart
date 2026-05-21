@@ -9,6 +9,7 @@ import '../repositories/chat_repository.dart';
 import '../repositories/user_repository.dart';
 import '../repositories/map_repository.dart';
 import '../services/auth_service.dart';
+import '../viewmodels/admin_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/chat_viewmodel.dart';
 import '../viewmodels/community_viewmodel.dart';
@@ -88,6 +89,46 @@ class _IsDexAppState extends State<IsDexApp> {
             currentUserId: () => ctx.read<AuthViewModel>().user?.uid,
             currentUserDisplay: () => ctx.read<AuthViewModel>().user?.username ?? ctx.read<AuthViewModel>().user?.email ?? '',
           ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final vm = AdminViewModel(
+              authViewModel: ctx.read<AuthViewModel>(),
+              watchAllSightings: () => ctx.read<SightingRepository>().watchAll(),
+              updateSightingStatus: (id, status) =>
+                  ctx.read<SightingRepository>().updateStatus(id, status),
+              deleteSighting: (id) =>
+                  ctx.read<SightingRepository>().delete(id),
+              watchReportedPosts: () =>
+                  ctx.read<CommunityRepository>().watchReportedPosts(),
+              dismissReport: (postId) =>
+                  ctx.read<CommunityRepository>().dismissReport(postId),
+              archivePost: (postId) =>
+                  ctx.read<CommunityRepository>().archivePost(postId),
+              watchFishCatalog: () =>
+                  ctx.read<FishRepository>().watchAll(),
+              watchArchivedFish: () =>
+                  ctx.read<FishRepository>().watchArchive(),
+              addFish: (fish) =>
+                  ctx.read<FishRepository>().add(fish),
+              updateFish: (fish) =>
+                  ctx.read<FishRepository>().update(fish),
+              archiveFish: (id) =>
+                  ctx.read<FishRepository>().archive(id),
+              restoreFish: (id) =>
+                  ctx.read<FishRepository>().restore(id),
+              hardDeleteFish: (id, {fromArchive = false}) =>
+                  ctx.read<FishRepository>().hardDelete(id, fromArchive: fromArchive),
+              watchUsers: () =>
+                  ctx.read<UserRepository>().watchAll(),
+              updateUserRole: (uid, role) =>
+                  ctx.read<UserRepository>().updateRole(uid, role),
+              allFishSnapshot: () =>
+                  ctx.read<FishRepository>().watchAll().first,
+            );
+            vm.init();
+            return vm;
+          },
         ),
       ],
       child: MaterialApp.router(
