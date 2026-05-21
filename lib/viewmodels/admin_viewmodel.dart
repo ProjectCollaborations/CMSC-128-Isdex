@@ -21,6 +21,7 @@ typedef RestoreFishFn = Future<void> Function(String id);
 typedef HardDeleteFishFn = Future<void> Function(String id, {bool fromArchive});
 typedef WatchUsersFn = Stream<List<AppUser>> Function();
 typedef UpdateUserRoleFn = Future<void> Function(String uid, String role);
+typedef AllFishSnapshotFn = Future<List<Fish>> Function();
 
 class AdminViewModel extends ChangeNotifier {
   final AuthViewModel _authVm;
@@ -39,6 +40,8 @@ class AdminViewModel extends ChangeNotifier {
   final HardDeleteFishFn _hardDeleteFish;
   final WatchUsersFn _watchUsers;
   final UpdateUserRoleFn _updateUserRole;
+  // ignore: unused_field
+  final AllFishSnapshotFn _allFishSnapshot;
 
   // ── Gate state ──
   bool _initialized = false;
@@ -149,6 +152,7 @@ class AdminViewModel extends ChangeNotifier {
     required HardDeleteFishFn hardDeleteFish,
     required WatchUsersFn watchUsers,
     required UpdateUserRoleFn updateUserRole,
+    required AllFishSnapshotFn allFishSnapshot,
   })  : _authVm = authViewModel,
         _watchAllSightings = watchAllSightings,
         _updateSightingStatus = updateSightingStatus,
@@ -164,7 +168,8 @@ class AdminViewModel extends ChangeNotifier {
         _restoreFish = restoreFish,
         _hardDeleteFish = hardDeleteFish,
         _watchUsers = watchUsers,
-        _updateUserRole = updateUserRole;
+        _updateUserRole = updateUserRole,
+        _allFishSnapshot = allFishSnapshot;
 
   Future<void> init() async {
     _currentUserRole = _authVm.userRole;
@@ -179,11 +184,16 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   void _startListening() {
-    _subs.add(_watchAllSightings().listen(_onSightingsChanged));
-    _subs.add(_watchReportedPosts().listen(_onReportedPostsChanged));
-    _subs.add(_watchFishCatalog().listen(_onFishCatalogChanged));
-    _subs.add(_watchArchivedFish().listen(_onArchivedFishChanged));
-    _subs.add(_watchUsers().listen(_onUsersChanged));
+    _subs.add(_watchAllSightings().listen(_onSightingsChanged,
+        onError: (_) {}));
+    _subs.add(_watchReportedPosts().listen(_onReportedPostsChanged,
+        onError: (_) {}));
+    _subs.add(_watchFishCatalog().listen(_onFishCatalogChanged,
+        onError: (_) {}));
+    _subs.add(_watchArchivedFish().listen(_onArchivedFishChanged,
+        onError: (_) {}));
+    _subs.add(_watchUsers().listen(_onUsersChanged,
+        onError: (_) {}));
   }
 
   void _onSightingsChanged(List<Sighting> sightings) {
@@ -265,26 +275,19 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   Future<void> approveSelected() async {
-    if (_selectedIds.isEmpty) return;
+    if (_selectedIds.isEmpty || _fishCatalog.isEmpty) return;
     _isProcessing = true;
     notifyListeners();
 
     try {
-      final knownFishIds = {
-        ..._fishCatalog.map((f) => f.id),
-        ..._fishCatalog.map((f) => f.commonName),
-      };
+      final knownFishIds = _fishCatalog.map((f) => f.id).toSet();
 
       for (final id in _selectedIds) {
-        final sighting = _sightings.firstWhere(
-          (s) => s.id == id,
-          orElse: () => _sightings.isNotEmpty ? _sightings.first : Sighting(
-            id: '', fishName: '', fishId: '', displayName: '', userId: '',
-            notes: '', latitude: 0, longitude: 0, createdAt: '',
-            status: SightingStatus.pending, isAnonymous: false,
-          ),
+        final sighting = _sightings.cast<Sighting?>().firstWhere(
+          (s) => s?.id == id,
+          orElse: () => null,
         );
-        if (sighting.id.isEmpty) continue;
+        if (sighting == null) continue;
 
         final errors = approvalValidationErrors(sighting, knownFishIds);
         if (errors.isNotEmpty) continue;
@@ -293,7 +296,7 @@ class AdminViewModel extends ChangeNotifier {
       }
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -308,13 +311,11 @@ class AdminViewModel extends ChangeNotifier {
       }
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
   Future<void> approveSighting(String id) async {
-    await _updateSightingStatus(id, SightingStatus.approved);
-    // Also clear report flag
     await _updateSightingStatus(id, SightingStatus.approved);
   }
 
@@ -343,7 +344,7 @@ class AdminViewModel extends ChangeNotifier {
       await _addFish(fish);
     } finally {
       _fishProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -354,11 +355,11 @@ class AdminViewModel extends ChangeNotifier {
       await _updateFish(fish);
     } finally {
       _fishProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
-  Future<bool> isFishReferenced(String fishId) async {
+  bool isFishReferenced(String fishId) {
     for (final sighting in _sightings) {
       if (sighting.fishId == fishId) return true;
     }
@@ -366,7 +367,7 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   Future<void> archiveFish(String id) async {
-    final referenced = await isFishReferenced(id);
+    final referenced = isFishReferenced(id);
     if (referenced) {
       throw Exception('Cannot archive: this fish is referenced by sightings.');
     }
@@ -376,7 +377,7 @@ class AdminViewModel extends ChangeNotifier {
       await _archiveFish(id);
     } finally {
       _fishProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -387,7 +388,7 @@ class AdminViewModel extends ChangeNotifier {
       await _restoreFish(id);
     } finally {
       _fishProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -431,7 +432,7 @@ class AdminViewModel extends ChangeNotifier {
       await _updateUserRole(uid, role);
     } finally {
       _usersProcessing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
