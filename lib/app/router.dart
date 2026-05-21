@@ -1,7 +1,12 @@
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../viewmodels/admin_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/fish_catalog_viewmodel.dart';
+import '../repositories/community_repository.dart';
+import '../repositories/fish_repository.dart';
+import '../repositories/sighting_repository.dart';
+import '../repositories/user_repository.dart';
 import '../views/catalog/landing_screen.dart';
 import '../views/catalog/fish_detail_screen.dart';
 import '../views/catalog/fish_image_search_screen.dart';
@@ -31,6 +36,12 @@ GoRouter createRouter(AuthViewModel authVm) {
 
       if (!loggedIn && !onAuthRoute) return '/login';
       if (loggedIn && onAuthRoute) return '/';
+
+      final onAdmin = state.matchedLocation == '/admin';
+      if (onAdmin) {
+        final role = context.read<AuthViewModel>().userRole;
+        if (role != 'admin' && role != 'mod') return '/';
+      }
 
       return null;
     },
@@ -98,7 +109,47 @@ GoRouter createRouter(AuthViewModel authVm) {
       ),
       GoRoute(
         path: '/admin',
-        builder: (context, state) => const AdminScreen(),
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (ctx) {
+            final vm = AdminViewModel(
+              authViewModel: ctx.read<AuthViewModel>(),
+              watchAllSightings: () => ctx.read<SightingRepository>().watchAll(),
+              updateSightingStatus: (id, status) =>
+                  ctx.read<SightingRepository>().updateStatus(id, status),
+              deleteSighting: (id) =>
+                  ctx.read<SightingRepository>().delete(id),
+              watchReportedPosts: () =>
+                  ctx.read<CommunityRepository>().watchReportedPosts(),
+              dismissReport: (postId) =>
+                  ctx.read<CommunityRepository>().dismissReport(postId),
+              archivePost: (postId) =>
+                  ctx.read<CommunityRepository>().archivePost(postId),
+              watchFishCatalog: () =>
+                  ctx.read<FishRepository>().watchAll(),
+              watchArchivedFish: () =>
+                  ctx.read<FishRepository>().watchArchive(),
+              addFish: (fish) =>
+                  ctx.read<FishRepository>().add(fish),
+              updateFish: (fish) =>
+                  ctx.read<FishRepository>().update(fish),
+              archiveFish: (id) =>
+                  ctx.read<FishRepository>().archive(id),
+              restoreFish: (id) =>
+                  ctx.read<FishRepository>().restore(id),
+              hardDeleteFish: (id, {fromArchive = false}) =>
+                  ctx.read<FishRepository>().hardDelete(id, fromArchive: fromArchive),
+              watchUsers: () =>
+                  ctx.read<UserRepository>().watchAll(),
+              updateUserRole: (uid, role) =>
+                  ctx.read<UserRepository>().updateRole(uid, role),
+              allFishSnapshot: () =>
+                  ctx.read<FishRepository>().watchAll().first,
+            );
+            vm.init();
+            return vm;
+          },
+          child: const AdminScreen(),
+        ),
       ),
     ],
   );
