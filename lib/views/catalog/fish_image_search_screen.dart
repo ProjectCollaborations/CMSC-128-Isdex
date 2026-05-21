@@ -450,9 +450,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search by Photo'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: Column(
         children: [
@@ -492,9 +489,9 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppTheme.surface),
       ),
       child: _imageFile != null
           ? ClipRRect(
@@ -504,11 +501,11 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
           : Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.camera_alt, size: 48, color: Colors.grey[400]),
+                Icon(Icons.camera_alt, size: 48, color: AppTheme.textSecondary),
                 const SizedBox(height: 8),
                 Text(
                   'Take or select a photo of a fish',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -556,16 +553,16 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue[50],
+        color: AppTheme.teal50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue[200]!),
+        border: Border.all(color: AppTheme.teal200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, size: 16, color: Colors.blue[700]),
+              Icon(Icons.auto_awesome, size: 16, color: AppTheme.navy500),
               const SizedBox(width: 8),
               Text(
                 'AI Predictions:',
@@ -583,7 +580,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: AppTheme.teal200),
                 ),
                 child: Text(label, style: TextStyle(fontSize: 12, color: Colors.blue[800])),
               );
@@ -597,12 +594,12 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(child: Divider(color: Colors.grey[300])),
+        const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text('OR', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
         ),
-        Expanded(child: Divider(color: Colors.grey[300])),
+        const Expanded(child: Divider()),
       ],
     );
   }
@@ -611,24 +608,24 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green[50],
+        color: AppTheme.teal50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green[200]!),
+        border: Border.all(color: AppTheme.teal200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.search, size: 20, color: Colors.green[700]),
+              Icon(Icons.search, size: 20, color: AppTheme.navy500),
               const SizedBox(width: 8),
               const Text('Manual Search', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Search by common name, scientific name, or local name:',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),
           Row(
@@ -637,7 +634,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                 child: TextField(
                   controller: _searchController,
                   enabled: !_isLoading,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Enter fish name...',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -680,7 +677,11 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(
         'Found ${_matchedFish.length} matching fish',
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          color: AppTheme.textPrimary,
+        ),
       ),
     );
   }
@@ -692,7 +693,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       itemCount: _matchedFish.length,
       itemBuilder: (context, i) {
         final fish = _matchedFish[i];
-        return Card(
+        return AppCard(
           margin: const EdgeInsets.only(bottom: 12),
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -747,13 +748,13 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                           decoration: BoxDecoration(color: Colors.blue[100], borderRadius: BorderRadius.circular(10)),
                           child: Text(fish.habitat, style: TextStyle(fontSize: 10, color: Colors.blue[800], fontWeight: FontWeight.w500)),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  Icon(Icons.chevron_right, color: Colors.grey[400]),
-                ],
+                  ],
+                ),
               ),
-            ),
+              const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+            ],
           ),
         );
       },
@@ -765,7 +766,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+          const Icon(Icons.search_off, size: 64, color: AppTheme.textSecondary),
           const SizedBox(height: 16),
           Text(_statusMessage, style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
         ],

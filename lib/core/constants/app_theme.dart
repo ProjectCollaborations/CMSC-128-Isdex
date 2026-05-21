@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   AppTheme._();
 
-  static const Color darkNavy = Color(0xFF002347);
-  static const Color lightBlue = Color(0xFFBFE7FF);
-  static const Color accentBlue = Color(0xFF5CC6FF);
-  static const Color background = Color(0xFFF5F7FB);
+  // ── Color Palette ──
+  static const Color navy900 = Color(0xFF001A3E);
+  static const Color navy700 = Color(0xFF002F6C);
+  static const Color navy500 = Color(0xFF004A9E);
+  static const Color teal400 = Color(0xFF42A5F5);
+  static const Color teal200 = Color(0xFF80DEEA);
+  static const Color teal50 = Color(0xFFE0F7FA);
+  static const Color surface = Color(0xFFF5F7FB);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFF001A3E);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color error = Color(0xFFDC2626);
+  static const Color success = Color(0xFF16A34A);
 
   // IUCN conservation status colors (from fish_detail_page.dart)
   static const Map<String, Color> statusColors = {
@@ -20,4 +30,105 @@ class AppTheme {
     'Data Deficient (DD)': Color(0xFF607D8B),
     'Not Evaluated (NE)': Color(0xFF9E9E9E),
   };
+
+  static ThemeData get light => ThemeData(
+    useMaterial3: true,
+    fontFamily: GoogleFonts.inter().fontFamily,
+    scaffoldBackgroundColor: surface,
+    colorScheme: ColorScheme.light(
+      primary: teal400,
+      secondary: navy500,
+      surface: card,
+      error: error,
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: navy900,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: GoogleFonts.poppins(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: teal400,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+      ),
+    ),
+    cardTheme: CardThemeData(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      color: card,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: teal50,
+      labelStyle: const TextStyle(fontSize: 12),
+      side: const BorderSide(color: teal200),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: Colors.white,
+      selectedItemColor: teal400,
+      unselectedItemColor: textSecondary,
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
+      showSelectedLabels: false,
+      showUnselectedLabels: false,
+      selectedIconTheme: const IconThemeData(size: 28),
+      unselectedIconTheme: const IconThemeData(size: 28),
+    ),
+    dividerTheme: DividerThemeData(
+      color: navy900.withValues(alpha: 0.08),
+      thickness: 1,
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: teal400,
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: navy900,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: navy900,
+        side: const BorderSide(color: navy900),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+    ),
+  );
 }

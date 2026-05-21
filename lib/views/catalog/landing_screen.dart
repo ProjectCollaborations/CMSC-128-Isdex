@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants/app_theme.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/status_chip.dart';
 import '../../viewmodels/fish_catalog_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/fish.dart';
-
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -50,20 +52,31 @@ class _LandingScreenState extends State<LandingScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.person, color: Colors.blue),
+                leading: const Icon(Icons.person, color: AppTheme.teal400),
                 title: Text(user?.email ?? 'User'),
                 subtitle: const Text('Logged in'),
               ),
               const Divider(),
+              if (authVm.userRole == 'admin' || authVm.userRole == 'mod')
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings,
+                      color: AppTheme.teal400),
+                  title: const Text('Admin Panel'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/admin');
+                  },
+                ),
               ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
+                leading: const Icon(Icons.logout, color: AppTheme.error),
                 title: const Text('Sign Out'),
                 onTap: () async {
                   Navigator.pop(context);
                   await authVm.signOut();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Signed out successfully')),
+                      const SnackBar(
+                          content: Text('Signed out successfully')),
                     );
                   }
                 },
@@ -81,103 +94,109 @@ class _LandingScreenState extends State<LandingScreen> {
     final authVm = context.watch<AuthViewModel>();
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: Column(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        title: Row(
           children: [
-            _buildHeader(authVm),
-            _buildSearchBar(catalogVm),
-            _buildHabitatFilters(catalogVm),
-            _buildFishList(catalogVm),
-            _buildBottomNav(authVm),
+            Image.asset(
+              'assets/images/isdex_logo.png',
+              height: 32,
+              width: 32,
+            ),
+            const SizedBox(width: 8),
+            const Text('Isdex'),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(AuthViewModel authVm) {
-    final user = authVm.user;
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/images/isdex_logo.png',
-                height: 40,
-                width: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Isdex',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
-          ),
-          ElevatedButton(
-            onPressed: () {
+        actions: [
+          GestureDetector(
+            onTap: () {
               if (!authVm.isLoggedIn) {
                 context.go('/login');
               } else {
                 _showUserMenu();
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[100],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (authVm.isLoggedIn)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        authVm.user?.username ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  const Icon(Icons.person, color: Colors.white),
+                ],
               ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.person, color: Colors.blue),
-                const SizedBox(width: 4),
-                Text(
-                  !authVm.isLoggedIn
-                      ? 'Log in/Sign up'
-                      : user?.email.split('@')[0] ?? 'User',
-                  style: const TextStyle(color: Colors.blue),
-                ),
-              ],
             ),
           ),
         ],
       ),
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          _buildHabitatFilters(catalogVm),
+          _buildFishList(catalogVm),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0,
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          if (authVm.isLoggedIn)
+            const BottomNavigationBarItem(
+                icon: Icon(Icons.people), label: 'Community'),
+          const BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.location_on), label: 'Sightings'),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.auto_awesome), label: 'AI'),
+          if (authVm.userRole == 'admin' || authVm.userRole == 'mod')
+            const BottomNavigationBarItem(
+                icon: Icon(Icons.admin_panel_settings), label: 'Admin'),
+        ],
+        onTap: (index) {
+          final actions = <void Function()>[
+            () {}, // Home
+          ];
+          if (authVm.isLoggedIn) {
+            actions.add(() => context.push('/community'));
+          }
+          actions.add(() => context.push('/map'));
+          actions.add(() => context.push('/sighting'));
+          actions.add(() => context.push('/chat'));
+          if (authVm.userRole == 'admin' || authVm.userRole == 'mod') {
+            actions.add(() => context.go('/admin'));
+          }
+          if (index < actions.length) {
+            actions[index]();
+          }
+        },
+      ),
     );
   }
 
-  Widget _buildSearchBar(FishCatalogViewModel catalogVm) {
-    return Container(
-      color: Colors.white,
+  Widget _buildSearchBar() {
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(25),
-        ),
-        child: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Search Species',
-            border: InputBorder.none,
-            prefixIcon: const Icon(Icons.search, color: Colors.grey),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.camera_alt, color: Colors.blue),
-              tooltip: 'Search by photo',
-              onPressed: () {
-                context.push('/fish-search');
-              },
-            ),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search Species',
+          prefixIcon:
+              const Icon(Icons.search, color: AppTheme.textSecondary),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.camera_alt, color: AppTheme.teal400),
+            tooltip: 'Search by photo',
+            onPressed: () => context.push('/fish-search'),
           ),
         ),
       ),
@@ -185,34 +204,39 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   Widget _buildHabitatFilters(FishCatalogViewModel catalogVm) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: FishCatalogViewModel.habitats.map((habitat) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(habitat),
-                selected: catalogVm.selectedHabitat == habitat,
-                onSelected: (_) {
-                  context
-                      .read<FishCatalogViewModel>()
-                      .filterByHabitat(habitat);
-                },
-                backgroundColor: Colors.white,
-                selectedColor: Colors.blue[100],
-                side: BorderSide(
-                  color: catalogVm.selectedHabitat == habitat
-                      ? Colors.blue
-                      : Colors.grey[300]!,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: FishCatalogViewModel.habitats.map((habitat) {
+          final isSelected = catalogVm.selectedHabitat == habitat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(
+                habitat,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textPrimary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
                 ),
               ),
-            );
-          }).toList(),
-        ),
+              selected: isSelected,
+              onSelected: (_) =>
+                  context.read<FishCatalogViewModel>().filterByHabitat(habitat),
+              selectedColor: AppTheme.navy500,
+              backgroundColor: Colors.white,
+              checkmarkColor: Colors.white,
+              side: BorderSide(
+                color: isSelected
+                    ? AppTheme.navy500
+                    : AppTheme.navy500.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+              showCheckmark: true,
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -222,10 +246,10 @@ class _LandingScreenState extends State<LandingScreen> {
       child: catalogVm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : catalogVm.filteredFish.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No species found',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 )
               : ListView.builder(
@@ -241,61 +265,6 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
     );
   }
-
-  Widget _buildBottomNav(AuthViewModel authVm) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          const IconButton(
-            onPressed: null,
-            icon: Icon(Icons.home, color: Colors.blue, size: 28),
-          ),
-          if (authVm.isLoggedIn)
-            IconButton(
-              onPressed: () {
-                context.push('/community');
-              },
-              icon: Icon(Icons.people, color: Colors.grey[400], size: 28),
-            ),
-          IconButton(
-            onPressed: () {
-              context.push('/map');
-            },
-            icon: Icon(Icons.map, color: Colors.grey[400], size: 28),
-            tooltip: 'Reference map',
-          ),
-          IconButton(
-            onPressed: () {
-              context.push('/sighting');
-            },
-            icon: Icon(
-              Icons.location_on,
-              color: authVm.isLoggedIn ? Colors.grey : Colors.grey[400],
-              size: 28,
-            ),
-            tooltip: authVm.isLoggedIn
-                ? 'User sightings (add & view)'
-                : 'User sightings (view only)',
-          ),
-          if (authVm.isLoggedIn)
-            IconButton(
-              onPressed: () {
-                context.push('/chat');
-              },
-              icon: Icon(
-                Icons.auto_awesome,
-                color: Colors.grey[400],
-                size: 28,
-              ),
-              tooltip: 'AI Assistant',
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FishCard extends StatelessWidget {
@@ -306,92 +275,62 @@ class _FishCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 12),
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey[200]!,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: fish.imageUrl.isNotEmpty
-                  ? Image.asset(
-                      fish.imageUrl,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 50,
-                          height: 50,
-                          color: Colors.grey[200],
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 30,
-                            color: Colors.grey[400],
-                          ),
-                        );
-                      },
-                    )
-                  : Container(
-                      width: 50,
-                      height: 50,
-                      color: Colors.grey[200],
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 30,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fish.commonName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: fish.imageUrl.isNotEmpty
+                ? Image.asset(
+                    fish.imageUrl,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _placeholderImage(),
+                  )
+                : _placeholderImage(),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fish.commonName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
                   ),
-                  Text(
-                    fish.scientificName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
+                ),
+                Text(
+                  fish.scientificName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontStyle: FontStyle.italic,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    fish.habitat,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                StatusChip(label: fish.habitat, color: AppTheme.teal400),
+              ],
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
-          ],
-        ),
+          ),
+          Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+        ],
       ),
+    );
+  }
+
+  Widget _placeholderImage() {
+    return Container(
+      width: 50,
+      height: 50,
+      color: Colors.grey[200],
+      child:
+          Icon(Icons.image_outlined, size: 30, color: Colors.grey[400]),
     );
   }
 }

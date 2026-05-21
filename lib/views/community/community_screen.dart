@@ -5,37 +5,65 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/constants/app_theme.dart';
+import '../../core/widgets/app_card.dart';
 import '../../viewmodels/community_viewmodel.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/community_post.dart';
 
-class CommunityScreen extends StatelessWidget {
+class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
+
+  @override
+  State<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends State<CommunityScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthViewModel>().addListener(_onAuthChanged);
+    });
+  }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    context.read<CommunityViewModel>().refreshLikedState();
+  }
+
+  @override
+  void dispose() {
+    try {
+      context.read<AuthViewModel>().removeListener(_onAuthChanged);
+    } catch (_) {}
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<CommunityViewModel>();
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        title: const Text(
-          'Isdex Community',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Isdex Community')),
       body: SafeArea(
         child: vm.isLoading
             ? const Center(child: CircularProgressIndicator())
             : vm.posts.isEmpty
-                ? const Center(child: Text('No posts yet'))
+                ? Center(
+                    child: Text(
+                      'No posts yet',
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.only(bottom: 80),
                     itemCount: vm.posts.length,
                     itemBuilder: (context, index) {
                       final post = vm.posts[index];
                       return _PostCard(
+                        key: ValueKey('${post.id}_${post.likes}'),
                         post: post,
                         isLiked: vm.likedPostIds.contains(post.id),
                         commentCount: vm.commentCounts[post.id] ?? 0,
@@ -72,9 +100,10 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onDelete;
-  final VoidCallback onReport;
+  final Future<void> Function() onReport;
 
   const _PostCard({
+    super.key,
     required this.post,
     required this.isLiked,
     required this.commentCount,
@@ -91,23 +120,25 @@ class _PostCard extends StatelessWidget {
     Uint8List? imageBytes =
         post.imageBase64.isNotEmpty ? base64Decode(post.imageBase64) : null;
 
-    return Card(
+    return AppCard(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (imageBytes != null)
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: Image.memory(imageBytes, fit: BoxFit.cover),
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Image.memory(imageBytes, fit: BoxFit.cover),
+              ),
             ),
           Row(
             children: [
               IconButton(
                 icon: Icon(
                   isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: isLiked ? Colors.red : Colors.black,
+                  color: isLiked ? Colors.red : AppTheme.textPrimary,
                 ),
                 onPressed: isLoggedIn ? onLike : () => _showLoginPrompt(context),
               ),
@@ -131,7 +162,7 @@ class _PostCard extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(width: 12),
                 Text('$commentCount comments',
-                    style: TextStyle(color: Colors.grey[700])),
+                    style: TextStyle(color: AppTheme.textSecondary)),
               ],
             ),
           ),
@@ -139,7 +170,7 @@ class _PostCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(color: Colors.black),
+                style: const TextStyle(color: AppTheme.textPrimary),
                 children: [
                   TextSpan(
                     text: '${post.username} ',
@@ -154,7 +185,7 @@ class _PostCard extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Text(
               _timeAgoFromMillis(post.timePosted),
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
             ),
           ),
         ],
@@ -189,15 +220,28 @@ class _PostCard extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.flag, color: Colors.orange),
                 title: const Text('Report inappropriate post'),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  onReport();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Post reported to moderators.'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
+                  try {
+                    await onReport();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Post reported to moderators.'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to report post. Please try again.'),
+                          backgroundColor: AppTheme.error,
+                        ),
+                      );
+                    }
+                  }
                 },
               ),
           ],
@@ -232,7 +276,7 @@ void _openCreatePostSheet(BuildContext context, CommunityViewModel vm) {
                   aspectRatio: 4 / 3,
                   child: imageFile != null
                       ? Image.file(imageFile!, fit: BoxFit.cover)
-                      : Container(color: Colors.grey[300]),
+                      : Container(color: AppTheme.surface),
                 ),
                 TextField(
                   controller: captionController,
