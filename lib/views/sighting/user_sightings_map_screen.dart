@@ -11,6 +11,7 @@ import '../../repositories/sighting_repository.dart';
 import '../../repositories/fish_repository.dart';
 import '../../services/geo_validation_service.dart';
 import '../../core/constants/app_theme.dart';
+import '../../core/widgets/status_chip.dart';
 
 enum _SightingLocationMode { currentLocation, mapSelection }
 
@@ -539,8 +540,11 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
       List<Sighting> visible, String? currentUid) {
     return visible.map((sighting) {
       final isOwner = sighting.userId == currentUid;
-      final pinColor =
-          sighting.status == SightingStatus.pending ? Colors.orange : Colors.red;
+      final pinColor = switch (sighting.status) {
+        SightingStatus.pending => Colors.orange,
+        SightingStatus.approved => AppTheme.error,
+        SightingStatus.rejected => Colors.grey,
+      };
 
       return Marker(
         point: LatLng(sighting.latitude, sighting.longitude),
@@ -592,18 +596,23 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                     fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
-              sighting.status == SightingStatus.pending
-                  ? 'Status: Pending Moderator Approval'
-                  : 'User-submitted sighting. May not be scientifically verified.',
+              switch (sighting.status) {
+                SightingStatus.pending => 'Status: Pending Moderator Approval',
+                SightingStatus.approved => 'User-submitted sighting. May not be scientifically verified.',
+                SightingStatus.rejected => 'This sighting was rejected by a moderator.',
+              },
               style: TextStyle(
                 fontSize: 13,
-                color: sighting.status == SightingStatus.pending
-                    ? Colors.orange
-                    : AppTheme.textSecondary,
+                color: switch (sighting.status) {
+                  SightingStatus.pending => Colors.orange,
+                  SightingStatus.approved => AppTheme.error,
+                  SightingStatus.rejected => Colors.grey,
+                },
                 fontStyle: FontStyle.italic,
-                fontWeight: sighting.status == SightingStatus.pending
-                    ? FontWeight.bold
-                    : FontWeight.normal,
+                fontWeight: switch (sighting.status) {
+                  SightingStatus.pending => FontWeight.bold,
+                  _ => FontWeight.normal,
+                },
               ),
             ),
           ],
@@ -659,6 +668,19 @@ class _UserSightingsMapScreenState extends State<UserSightingsMapScreen> {
                   style: const TextStyle(
                       fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
+              StatusChip(
+                label: switch (sighting.status) {
+                  SightingStatus.pending => 'Pending',
+                  SightingStatus.approved => 'Approved',
+                  SightingStatus.rejected => 'Rejected',
+                },
+                color: switch (sighting.status) {
+                  SightingStatus.pending => Colors.orange,
+                  SightingStatus.approved => AppTheme.error,
+                  SightingStatus.rejected => Colors.grey,
+                },
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   const Icon(Icons.person_outline,
