@@ -1,13 +1,9 @@
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:tflite_plus/tflite_plus.dart';
-import 'package:image/image.dart' as img;
 import '../../models/fish.dart';
-import 'dart:math';
+import '../../services/fish_classifier.dart';
 
 class FishImageSearchScreen extends StatefulWidget {
   final List<Fish> allSpecies;
@@ -18,7 +14,7 @@ class FishImageSearchScreen extends StatefulWidget {
 }
 
 class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
-  File? _imageFile;
+  Uint8List? _imageBytes;
   List<Fish> _matchedFish = [];
   List<String> _detectedLabels = [];
   bool _isLoading = false;
@@ -26,14 +22,10 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
   String _statusMessage = '';
   final TextEditingController _searchController = TextEditingController();
 
-  Interpreter? _interpreter;
-  List<String> _imagenetLabels = [];
-  static const int _inputSize = 224;
-  static const int _outputSize = 50; // ImageNet output classes
+  final FishClassifier _classifier = FishClassifier();
 
   // Confidence tuning
-  static const double _temperature = 0.7;      // lower = sharper (0.5-0.8 works well)
-  static const double _minConfidence = 0.35;    // only show fish with score >= 40%
+  static const double _minConfidence = 0.35;
 
   // Expanded mapping from ImageNet keywords to your fish species.
   final Map<String, List<String>> _keywordToFish = {
@@ -187,22 +179,22 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     _loadModel();
   }
 
-  // --------------------------------------------------------------
-  // Model loading
-  // --------------------------------------------------------------
   Future<void> _loadModel() async {
     setState(() => _isLoading = true);
     try {
-      _interpreter = await Interpreter.fromAsset('assets/models/model (1).tflite');
-      final labelString = await rootBundle.loadString('assets/models/labels (1).txt');
-      _imagenetLabels = labelString
-          .split('\n')
-          .map((l) => l.trim())
-          .where((l) => l.isNotEmpty)
-          .toList();
-      debugPrint('✅ Loaded ${_imagenetLabels.length} ImageNet labels');
+      await _classifier.init(
+        modelAsset: 'assets/models/model (1).tflite',
+        labelsAsset: 'assets/models/labels (1).txt',
+      );
+      debugPrint('✅ Model loaded');
       setState(() {
         _isModelReady = true;
+        _isLoading = false;
+      });
+    } on UnsupportedError {
+      debugPrint('ℹ️ AI classification not available on this platform');
+      setState(() {
+        _isModelReady = false;
         _isLoading = false;
       });
     } catch (e) {
@@ -214,9 +206,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
   }
 
-  // --------------------------------------------------------------
-  // Image picker
-  // --------------------------------------------------------------
   Future<void> _pickImage(ImageSource source) async {
     if (!_isModelReady) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -234,89 +223,24 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     );
     if (picked == null) return;
 
-    final imageFile = File(picked.path);
+    final bytes = await picked.readAsBytes();
     setState(() {
-      _imageFile = imageFile;
+      _imageBytes = bytes;
       _isLoading = true;
       _matchedFish = [];
       _detectedLabels = [];
       _statusMessage = 'Identifying fish...';
     });
 
-    await _classifyImage(imageFile);
+    await _classifyImage(bytes);
   }
 
-  // --------------------------------------------------------------
-  // Image preprocessing (224x224, RGB normalized to [-1, 1])
-  // --------------------------------------------------------------
-  Future<Float32List> _preprocessImage(File imageFile) async {
-    final bytes = await imageFile.readAsBytes();
-    img.Image? image = img.decodeImage(bytes);
-    if (image == null) throw Exception('Failed to decode image');
-
-    // Resize keeping aspect ratio, then center crop to 224x224
-    final scale = _inputSize / (image.width < image.height ? image.width : image.height);
-    int newWidth = (image.width * scale).round();
-    int newHeight = (image.height * scale).round();
-    image = img.copyResize(image, width: newWidth, height: newHeight);
-
-    final cropX = (image.width - _inputSize) ~/ 2;
-    final cropY = (image.height - _inputSize) ~/ 2;
-    image = img.copyCrop(image, x: cropX, y: cropY, width: _inputSize, height: _inputSize);
-
-    // Normalize pixel values to [-1, 1]
-    final input = Float32List(1 * _inputSize * _inputSize * 3);
-    int idx = 0;
-    for (int y = 0; y < _inputSize; y++) {
-      for (int x = 0; x < _inputSize; x++) {
-        final pixel = image.getPixel(x, y);
-        input[idx++] = (pixel.r / 127.5) - 1.0;
-        input[idx++] = (pixel.g / 127.5) - 1.0;
-        input[idx++] = (pixel.b / 127.5) - 1.0;
-      }
-    }
-    return input;
-  }
-
-  // --------------------------------------------------------------
-  // Run inference and map results to local fish (with temperature & threshold)
-  // --------------------------------------------------------------
-  Future<void> _classifyImage(File imageFile) async {
-    if (_interpreter == null) return;
-
+  Future<void> _classifyImage(Uint8List bytes) async {
     try {
-      // 1. Preprocess image
-      final flatInput = await _preprocessImage(imageFile);
-      // Reshape to [1, 224, 224, 3] as expected by the model
-      final input = List.generate(1, (_) => List.generate(_inputSize, (_) => List.generate(_inputSize, (_) => List.filled(3, 0.0))));
-      int idx = 0;
-      for (int h = 0; h < _inputSize; h++) {
-        for (int w = 0; w < _inputSize; w++) {
-          for (int c = 0; c < 3; c++) {
-            input[0][h][w][c] = flatInput[idx++];
-          }
-        }
-      }
-
-      // 2. Create output tensor (1001 classes)
-      final output = List.filled(1 * _outputSize, 0.0).reshape([1, _outputSize]);
-
-      // 3. Run inference
-      _interpreter!.run(input, output);
-
-      // 4. Convert raw logits to probabilities (with temperature scaling)
-      final probabilities = _softmax(output[0], temperature: _temperature);
-
-      // 5. Get top 10 predictions
-      final topPredictions = _getTopPredictions(probabilities, 10);
-
-      // 6. Map ImageNet labels to your fish species
-      final matched = _mapToLocalFish(topPredictions);
-
-      // 7. Filter by minimum confidence
+      final predictions = _classifier.classify(bytes, []);
+      final matched = _mapToLocalFish(predictions);
       final filtered = matched.where((e) => e.$2 >= _minConfidence).toList();
 
-      // 8. Update UI
       setState(() {
         if (filtered.isEmpty) {
           _statusMessage = 'No confident match (below ${(_minConfidence * 100).toInt()}%). Try manual search.';
@@ -338,30 +262,6 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
     }
   }
 
-  // Softmax with temperature scaling
-  List<double> _softmax(List<double> logits, {double temperature = 1.0}) {
-    final scaled = logits.map((x) => x / temperature).toList();
-    final maxLogit = scaled.reduce((a, b) => a > b ? a : b);
-    final expValues = scaled.map((x) => exp(x - maxLogit)).toList();
-    final sumExp = expValues.reduce((a, b) => a + b);
-    return expValues.map<double>((x) => x / sumExp).toList();
-  }
-
-  // Get top-K indices and labels
-  List<(String, double)> _getTopPredictions(List<double> probabilities, int topK) {
-    final indices = List.generate(probabilities.length, (i) => i);
-    indices.sort((a, b) => probabilities[b].compareTo(probabilities[a]));
-    final result = <(String, double)>[];
-    for (int i = 0; i < topK && i < indices.length; i++) {
-      final idx = indices[i];
-      if (idx < _imagenetLabels.length && probabilities[idx] > 0.01) {
-        result.add((_imagenetLabels[idx], probabilities[idx]));
-      }
-    }
-    return result;
-  }
-
-  // Map ImageNet labels to your fish list using keyword matching
   List<(Fish, double)> _mapToLocalFish(List<(String, double)> predictions) {
     final Map<Fish, double> scoreMap = {};
 
@@ -444,7 +344,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
 
   @override
   void dispose() {
-    _interpreter?.close();
+    _classifier.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -471,7 +371,7 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
                   _buildImagePreview(),
                   const SizedBox(height: 16),
                   _buildActionButtons(),
-                  if (_detectedLabels.isNotEmpty && !_isLoading && _imageFile != null)
+                  if (_detectedLabels.isNotEmpty && !_isLoading && _imageBytes != null)
                     _buildLabelsSection(),
                   const SizedBox(height: 24),
                   _buildDivider(),
@@ -503,10 +403,10 @@ class _FishImageSearchScreenState extends State<FishImageSearchScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: _imageFile != null
+      child: _imageBytes != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.file(_imageFile!, fit: BoxFit.cover),
+              child: Image.memory(_imageBytes!, fit: BoxFit.cover),
             )
           : Column(
               mainAxisAlignment: MainAxisAlignment.center,

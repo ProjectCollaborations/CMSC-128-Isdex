@@ -63,7 +63,14 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ],
       ),
-      body: SafeArea(child: _buildBody(vm)),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: _buildBody(vm),
+          ),
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: vm.currentTabIndex,
         onTap: vm.setTab,

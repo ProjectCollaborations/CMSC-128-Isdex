@@ -71,7 +71,6 @@ flutter_export_environment.sh
 **/windows/flutter/ephemeral/
 
 # ── Web ───────────────────────────────────────────────────────────
-lib/generated_plugin_registrant.dart
 
 # ── Firebase ──────────────────────────────────────────────────────
 # Keep firebase.json (your app config), but ignore secrets

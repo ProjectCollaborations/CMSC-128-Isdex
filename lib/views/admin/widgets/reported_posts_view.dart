@@ -62,23 +62,20 @@ class ReportedPostsView extends StatelessWidget {
           ),
           TextButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx);
               try {
                 await context.read<AdminViewModel>().archiveReportedPost(postId);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Post archived.'),
-                      backgroundColor: AppTheme.success,
-                    ),
-                  );
-                }
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Post archived.'),
+                    backgroundColor: AppTheme.success,
+                  ),
+                );
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Archive failed: $e')),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Archive failed: $e')),
+                );
               }
             },
             child: const Text('Archive', style: TextStyle(color: AppTheme.error)),
@@ -103,23 +100,20 @@ class ReportedPostsView extends StatelessWidget {
           ),
           TextButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx);
               try {
                 await context.read<AdminViewModel>().dismissReport(postId);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Report dismissed.'),
-                      backgroundColor: AppTheme.success,
-                    ),
-                  );
-                }
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Report dismissed.'),
+                    backgroundColor: AppTheme.success,
+                  ),
+                );
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Dismiss failed: $e')),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Dismiss failed: $e')),
+                );
               }
             },
             child: const Text('Dismiss',

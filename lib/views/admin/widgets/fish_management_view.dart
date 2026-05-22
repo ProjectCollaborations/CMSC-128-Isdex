@@ -141,31 +141,22 @@ class FishManagementView extends StatelessWidget {
                                   ),
                                   tooltip:
                                       isArchived ? 'Restore' : 'Archive',
-                                  onPressed: () {
-                                    if (isArchived) {
-                                      vm.restoreFish(fish.id).catchError(
-                                          (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                                content:
-                                                    Text(e.toString())),
-                                          );
-                                        }
-                                      });
-                                    } else {
-                                      vm.archiveFish(fish.id).catchError(
-                                          (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                                content:
-                                                    Text(e.toString())),
-                                          );
-                                        }
-                                      });
+                                  onPressed: () async {
+                                    try {
+                                      if (isArchived) {
+                                        await vm.restoreFish(fish.id);
+                                      } else {
+                                        await vm.archiveFish(fish.id);
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content:
+                                                  Text(e.toString())),
+                                        );
+                                      }
                                     }
                                   },
                                 ),
@@ -209,21 +200,21 @@ class FishManagementView extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx);
-              context
-                  .read<AdminViewModel>()
-                  .hardDeleteFish(id, fromArchive: fromArchive)
-                  .catchError((e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Delete failed: $e'),
-                      backgroundColor: AppTheme.error,
-                    ),
-                  );
-                }
-              });
+              try {
+                await context
+                    .read<AdminViewModel>()
+                    .hardDeleteFish(id, fromArchive: fromArchive);
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Delete failed: $e'),
+                    backgroundColor: AppTheme.error,
+                  ),
+                );
+              }
             },
             child: const Text('Delete Forever',
                 style: TextStyle(color: AppTheme.error)),
