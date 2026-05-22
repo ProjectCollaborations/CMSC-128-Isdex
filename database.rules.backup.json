@@ -1,0 +1,90 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth.uid != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid",
+        "role": {
+          ".write": "auth.uid != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+        }
+      }
+    },
+
+    "user_sightings_temp": {
+      ".read": true,
+      ".indexOn": "status",
+      "$sighting_id": {
+        ".write": "auth != null && (data.child('userId').val() === auth.uid || !data.exists() && newData.child('userId').val() === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'mod')"
+      }
+    },
+
+    "userEmails": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "fish": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "map": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "chat_sessions": {
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid"
+      }
+    },
+
+    "community_posts": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$post_id": {
+        ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' ||
+          root.child('users').child(auth.uid).child('role').val() === 'mod' ||
+          (!data.exists() && newData.hasChild('uid') && newData.child('uid').val() === auth.uid) ||
+          (!newData.exists() && data.child('uid').val() === auth.uid) ||
+          (data.child('uid').val() === auth.uid) ||
+          (data.exists() && newData.exists() &&
+            data.child('uid').val() === newData.child('uid').val() &&
+            newData.hasChild('likes') &&
+            (newData.child('likes').val() === data.child('likes').val() + 1 ||
+             newData.child('likes').val() === data.child('likes').val() - 1)) ||
+          (data.exists() && newData.exists() &&
+            data.child('uid').val() === newData.child('uid').val() &&
+            newData.hasChild('isReported') &&
+            newData.child('isReported').val() === true)"
+      }
+    },
+
+    "post_likes": {
+      ".read": "auth != null",
+      "$post_id": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth.uid === $uid"
+        }
+      }
+    },
+
+    "post_comments": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$post_id": {
+        "$comment_id": {
+          ".validate": "newData.hasChild('uid') && newData.child('uid').val() === auth.uid || (!newData.exists() && data.child('uid').val() === auth.uid) || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'mod'"
+        }
+      }
+    },
+
+    "fish_archive": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    }
+  }
+}
