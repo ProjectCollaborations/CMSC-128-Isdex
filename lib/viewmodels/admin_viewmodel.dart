@@ -6,7 +6,8 @@ import '../models/fish.dart';
 import '../models/app_user.dart';
 import 'auth_viewmodel.dart';
 
-typedef WatchAllSightingsFn = Stream<List<Sighting>> Function();
+typedef WatchSightingsByStatusFn = Stream<List<Sighting>> Function(SightingStatus status);
+typedef BatchUpdateSightingStatusFn = Future<void> Function(Set<String> ids, SightingStatus status);
 typedef UpdateSightingStatusFn = Future<void> Function(String id, SightingStatus status);
 typedef DeleteSightingFn = Future<void> Function(String id);
 typedef WatchReportedPostsFn = Stream<List<CommunityPost>> Function();
@@ -25,7 +26,8 @@ typedef AllFishSnapshotFn = Future<List<Fish>> Function();
 
 class AdminViewModel extends ChangeNotifier {
   final AuthViewModel _authVm;
-  final WatchAllSightingsFn _watchAllSightings;
+  final WatchSightingsByStatusFn _watchSightingsByStatus;
+  final BatchUpdateSightingStatusFn _batchUpdateSightingStatus;
   final UpdateSightingStatusFn _updateSightingStatus;
   final DeleteSightingFn _deleteSighting;
   final WatchReportedPostsFn _watchReportedPosts;
@@ -50,9 +52,15 @@ class AdminViewModel extends ChangeNotifier {
   int _currentTabIndex = 0;
 
   // ── Tab 0: Sightings ──
-  List<Sighting> _sightings = [];
+  int _sightingsSubTabIndex = 0; // 0=pending, 1=approved, 2=archived
+  List<Sighting> _pendingSightings = [];
+  List<Sighting> _approvedSightings = [];
+  List<Sighting> _archivedSightings = [];
+  bool _pendingLoading = true;
+  bool _approvedLoading = false;
+  bool _archivedLoading = false;
+  bool _subTabInitialized = false;
   final Set<String> _selectedIds = {};
-  bool _sightingsLoading = true;
   bool _isProcessing = false;
 
   // ── Tab 1: Reports ──
@@ -84,9 +92,14 @@ class AdminViewModel extends ChangeNotifier {
   String get currentUserRole => _authVm.userRole;
   int get currentTabIndex => _currentTabIndex;
 
-  List<Sighting> get sightings => _sightings;
+  int get sightingsSubTabIndex => _sightingsSubTabIndex;
+  List<Sighting> get pendingSightings => _pendingSightings;
+  List<Sighting> get approvedSightings => _approvedSightings;
+  List<Sighting> get archivedSightings => _archivedSightings;
+  bool get pendingLoading => _pendingLoading;
+  bool get approvedLoading => _approvedLoading;
+  bool get archivedLoading => _archivedLoading;
   Set<String> get selectedIds => _selectedIds;
-  bool get sightingsLoading => _sightingsLoading;
   bool get reportsLoading => _reportsLoading;
   bool get fishCatalogLoading => _fishCatalogLoading;
   bool get usersLoading => _usersLoading;
@@ -143,7 +156,8 @@ class AdminViewModel extends ChangeNotifier {
 
   AdminViewModel({
     required AuthViewModel authViewModel,
-    required WatchAllSightingsFn watchAllSightings,
+    required WatchSightingsByStatusFn watchSightingsByStatus,
+    required BatchUpdateSightingStatusFn batchUpdateSightingStatus,
     required UpdateSightingStatusFn updateSightingStatus,
     required DeleteSightingFn deleteSighting,
     required WatchReportedPostsFn watchReportedPosts,
@@ -160,7 +174,8 @@ class AdminViewModel extends ChangeNotifier {
     required UpdateUserRoleFn updateUserRole,
     required AllFishSnapshotFn allFishSnapshot,
   })  : _authVm = authViewModel,
-        _watchAllSightings = watchAllSightings,
+        _watchSightingsByStatus = watchSightingsByStatus,
+        _batchUpdateSightingStatus = batchUpdateSightingStatus,
         _updateSightingStatus = updateSightingStatus,
         _deleteSighting = deleteSighting,
         _watchReportedPosts = watchReportedPosts,
@@ -208,7 +223,10 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   void _startListening() {
-    _subscribeWithRetry(_watchAllSightings, _onSightingsChanged);
+    _subscribeWithRetry(
+      () => _watchSightingsByStatus(SightingStatus.pending),
+      _onSightingsChanged,
+    );
     _subscribeWithRetry(_watchReportedPosts, _onReportedPostsChanged);
     _subscribeWithRetry(_watchFishCatalog, _onFishCatalogChanged);
     _subscribeWithRetry(_watchArchivedFish, _onArchivedFishChanged);
@@ -235,10 +253,23 @@ class AdminViewModel extends ChangeNotifier {
 
   void _onSightingsChanged(List<Sighting> sightings) {
     if (_disposed) return;
-    _sightings = sightings;
-    _sightingsLoading = false;
-    // Retain only selections that still exist
+    _pendingSightings = sightings;
+    _pendingLoading = false;
     _selectedIds.retainWhere((id) => sightings.any((s) => s.id == id));
+    notifyListeners();
+  }
+
+  void _onApprovedSightingsChanged(List<Sighting> sightings) {
+    if (_disposed) return;
+    _approvedSightings = sightings;
+    _approvedLoading = false;
+    notifyListeners();
+  }
+
+  void _onArchivedSightingsChanged(List<Sighting> sightings) {
+    if (_disposed) return;
+    _archivedSightings = sightings;
+    _archivedLoading = false;
     notifyListeners();
   }
 
@@ -277,6 +308,22 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   // ── Sightings ──
+  void setSightingsSubTab(int index) {
+    _sightingsSubTabIndex = index;
+    if (!_subTabInitialized) {
+      _subTabInitialized = true;
+      _subscribeWithRetry(
+        () => _watchSightingsByStatus(SightingStatus.approved),
+        _onApprovedSightingsChanged,
+      );
+      _subscribeWithRetry(
+        () => _watchSightingsByStatus(SightingStatus.rejected),
+        _onArchivedSightingsChanged,
+      );
+    }
+    notifyListeners();
+  }
+
   void toggleSelected(String id) {
     if (_selectedIds.contains(id)) {
       _selectedIds.remove(id);
@@ -287,7 +334,7 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   void selectAll() {
-    _selectedIds.addAll(_sightings.map((s) => s.id));
+    _selectedIds.addAll(_pendingSightings.map((s) => s.id));
     notifyListeners();
   }
 
@@ -314,15 +361,18 @@ class AdminViewModel extends ChangeNotifier {
 
     try {
       final knownFishIds = _fishCatalog.map((f) => f.id).toSet();
+      final validIds = <String>{};
 
       for (final id in _selectedIds) {
-        final sighting = _sightings.where((s) => s.id == id).firstOrNull;
+        final sighting = _pendingSightings.where((s) => s.id == id).firstOrNull;
         if (sighting == null) continue;
+        if (approvalValidationErrors(sighting, knownFishIds).isEmpty) {
+          validIds.add(id);
+        }
+      }
 
-        final errors = approvalValidationErrors(sighting, knownFishIds);
-        if (errors.isNotEmpty) continue;
-
-        await _updateSightingStatus(id, SightingStatus.approved);
+      if (validIds.isNotEmpty) {
+        await _batchUpdateSightingStatus(validIds, SightingStatus.approved);
       }
     } finally {
       _isProcessing = false;
@@ -336,9 +386,7 @@ class AdminViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      for (final id in _selectedIds) {
-        await _updateSightingStatus(id, SightingStatus.rejected);
-      }
+      await _batchUpdateSightingStatus(_selectedIds, SightingStatus.rejected);
     } finally {
       _isProcessing = false;
       if (!_disposed) notifyListeners();
@@ -425,7 +473,7 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   bool isFishReferenced(String fishId) {
-    for (final sighting in _sightings) {
+    for (final sighting in _pendingSightings) {
       if (sighting.fishId == fishId) return true;
     }
     return false;
