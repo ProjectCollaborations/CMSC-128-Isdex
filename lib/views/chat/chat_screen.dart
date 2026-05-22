@@ -476,8 +476,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             reverse: true,
                             itemCount: chatVm.messages.length,
                             itemBuilder: (context, index) {
-                              final msg =
-                                  chatVm.messages.reversed.toList()[index];
+                              final msg = chatVm.messages[index];
                               final isUser = msg.role == 'user';
                               final timeStr = DateFormat('jm').format(
                                 DateTime.fromMillisecondsSinceEpoch(
@@ -545,29 +544,29 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     );
 
-    return CustomScrollView(
+    return ListView(
       controller: _scrollController,
-      slivers: [
-        SliverToBoxAdapter(child: header),
-        SliverFillRemaining(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.auto_awesome,
-                  size: 64,
-                  color: AppTheme.teal400.withValues(alpha: 0.2),
-                ),
-                const SizedBox(height: 16),
-                  const Text(
-                    'Ask me anything about Philippine fish!',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
-                ),
-              ],
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      reverse: true,
+      children: [
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 64,
+                color: AppTheme.teal400.withValues(alpha: 0.2),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Ask me anything about Philippine fish!',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+              ),
+            ],
           ),
         ),
+        header,
       ],
     );
   }

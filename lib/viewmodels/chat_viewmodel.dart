@@ -40,9 +40,13 @@ class ChatViewModel extends ChangeNotifier {
 
   void _init() {
     final uid = _currentUserId();
-    if (uid == null) return;
+    if (uid == null) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _messagesSub = _watchMessages(uid).listen((messages) {
-      _messages = messages;
+      _messages = messages.reversed.toList();
       _isLoading = false;
       notifyListeners();
     });
