@@ -21,6 +21,36 @@ class SightingRepository {
     });
   }
 
+  Stream<List<Sighting>> watchByStatus(SightingStatus status) {
+    return _db
+        .child(FirebaseNodes.sightings)
+        .orderByChild('status')
+        .equalTo(status.name)
+        .onValue
+        .map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        return <Sighting>[];
+      }
+      final map = event.snapshot.value as Map<dynamic, dynamic>;
+      return map.entries
+          .map((e) => Sighting.fromMap(
+                e.key.toString(),
+                Map<dynamic, dynamic>.from(e.value as Map),
+              ))
+          .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    });
+  }
+
+  Future<void> batchUpdateStatus(
+      Set<String> ids, SightingStatus status) async {
+    final updates = <String, dynamic>{};
+    for (final id in ids) {
+      updates['${FirebaseNodes.sightingById(id)}/status'] = status.name;
+    }
+    await _db.child('/').update(updates);
+  }
+
   Stream<List<Sighting>> watchByUser(String uid) {
     return _db.child(FirebaseNodes.sightings).onValue.map((event) {
       if (!event.snapshot.exists || event.snapshot.value == null) return <Sighting>[];
