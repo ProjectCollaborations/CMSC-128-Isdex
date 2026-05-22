@@ -30,9 +30,15 @@ class SightingsQueueView extends StatelessWidget {
             selected: {vm.sightingsSubTabIndex},
             onSelectionChanged: (selected) =>
                 vm.setSightingsSubTab(selected.first),
-            style: SegmentedButton.styleFrom(
-              foregroundColor: Colors.white,
-              selectedBackgroundColor: AppTheme.navy500,
+            style: ButtonStyle(
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) return Colors.white;
+                return AppTheme.textPrimary;
+              }),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) return AppTheme.navy500;
+                return Colors.transparent;
+              }),
             ),
           ),
         ),
