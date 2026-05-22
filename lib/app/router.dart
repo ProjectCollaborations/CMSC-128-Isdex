@@ -117,7 +117,10 @@ GoRouter createRouter(AuthViewModel authVm) {
           create: (ctx) {
             final vm = AdminViewModel(
               authViewModel: ctx.read<AuthViewModel>(),
-              watchAllSightings: () => ctx.read<SightingRepository>().watchAll(),
+              watchSightingsByStatus: (status) =>
+                  ctx.read<SightingRepository>().watchByStatus(status),
+              batchUpdateSightingStatus: (ids, status) =>
+                  ctx.read<SightingRepository>().batchUpdateStatus(ids, status),
               updateSightingStatus: (id, status) =>
                   ctx.read<SightingRepository>().updateStatus(id, status),
               deleteSighting: (id) =>
