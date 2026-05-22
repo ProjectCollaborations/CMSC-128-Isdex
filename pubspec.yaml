@@ -60,3 +60,6 @@ flutter:
     - assets/models/1.tflite
     - assets/models/model (1).tflite
     - assets/models/labels (1).txt
+
+dependency_overrides:
+  ffi: 2.1.5
