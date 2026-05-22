@@ -174,7 +174,8 @@ void main() {
   AdminViewModel createVm({String role = 'admin', AppUser? authUser}) {
     return AdminViewModel(
       authViewModel: MockAuthViewModel(userRole: role, user: authUser),
-      watchAllSightings: () => sightingsController.stream,
+      watchSightingsByStatus: (status) => sightingsController.stream,
+      batchUpdateSightingStatus: (ids, status) async {},
       updateSightingStatus: (id, status) async {},
       deleteSighting: (id) async {},
       watchReportedPosts: () => reportedPostsController.stream,
@@ -218,7 +219,8 @@ void main() {
     test('1. Loading state before init', () {
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -285,15 +287,15 @@ void main() {
   // Sightings
   // ─────────────────────────────────────────────
   group('AdminViewModel - Sightings', () {
-    test('6. Stream populates sightings', () async {
+    test('6. Stream populates pending sightings', () async {
       vm = createVm(role: 'admin');
       await vm!.init();
 
       sightingsController.add([sightingPending, sightingBadLat]);
       await Future.delayed(const Duration(milliseconds: 50));
 
-      expect(vm!.sightings.length, 2);
-      expect(vm!.sightingsLoading, false);
+      expect(vm!.pendingSightings.length, 2);
+      expect(vm!.pendingLoading, false);
     });
 
     test('7. Select/deselect individual', () async {
@@ -324,16 +326,17 @@ void main() {
       expect(vm!.selectedIds, <String>{});
     });
 
-    test('9. Approve selected', () async {
-      String? approvedId;
-      SightingStatus? approvedStatus;
+    test('9. Approve selected via batch', () async {
+      Set<String>? batchIds;
+      SightingStatus? batchStatus;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
-        updateSightingStatus: (id, status) async {
-          approvedId = id;
-          approvedStatus = status;
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {
+          batchIds = ids;
+          batchStatus = status;
         },
+        updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
         dismissReport: (postId) async {},
@@ -358,21 +361,22 @@ void main() {
       vm!.selectAll();
       await vm!.approveSelected();
 
-      expect(approvedId, 's1');
-      expect(approvedStatus, SightingStatus.approved);
+      expect(batchIds, {'s1'});
+      expect(batchStatus, SightingStatus.approved);
       expect(vm!.isProcessing, false);
     });
 
-    test('10. Archive selected', () async {
-      String? archivedId;
-      SightingStatus? archivedStatus;
+    test('10. Archive selected via batch', () async {
+      Set<String>? batchIds;
+      SightingStatus? batchStatus;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
-        updateSightingStatus: (id, status) async {
-          archivedId = id;
-          archivedStatus = status;
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {
+          batchIds = ids;
+          batchStatus = status;
         },
+        updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
         dismissReport: (postId) async {},
@@ -396,8 +400,8 @@ void main() {
       vm!.selectAll();
       await vm!.archiveSelected();
 
-      expect(archivedId, 's1');
-      expect(archivedStatus, SightingStatus.rejected);
+      expect(batchIds, {'s1'});
+      expect(batchStatus, SightingStatus.rejected);
       expect(vm!.isProcessing, false);
     });
 
@@ -405,7 +409,8 @@ void main() {
       String? deletedId;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {
           deletedId = id;
@@ -472,7 +477,8 @@ void main() {
       String? dismissedId;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -502,7 +508,8 @@ void main() {
       String? archivedPostId;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -537,7 +544,8 @@ void main() {
       Fish? addedFish;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -567,7 +575,8 @@ void main() {
       Fish? updatedFish;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -597,7 +606,8 @@ void main() {
       String? archivedFishId;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -630,7 +640,8 @@ void main() {
       String? restoredId;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -661,7 +672,8 @@ void main() {
       bool? fromArchiveResult;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -693,7 +705,8 @@ void main() {
       bool archiveFishCalled = false;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin'),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -815,7 +828,8 @@ void main() {
       String? updatedRole;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin', user: adminUser),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
@@ -847,7 +861,8 @@ void main() {
       bool updateUserRoleCalled = false;
       vm = AdminViewModel(
         authViewModel: MockAuthViewModel(userRole: 'admin', user: adminUser),
-        watchAllSightings: () => sightingsController.stream,
+        watchSightingsByStatus: (status) => sightingsController.stream,
+        batchUpdateSightingStatus: (ids, status) async {},
         updateSightingStatus: (id, status) async {},
         deleteSighting: (id) async {},
         watchReportedPosts: () => reportedPostsController.stream,
