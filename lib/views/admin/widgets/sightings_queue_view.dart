@@ -30,6 +30,10 @@ class SightingsQueueView extends StatelessWidget {
             selected: {vm.sightingsSubTabIndex},
             onSelectionChanged: (selected) =>
                 vm.setSightingsSubTab(selected.first),
+            style: SegmentedButton.styleFrom(
+              foregroundColor: Colors.white,
+              selectedBackgroundColor: AppTheme.navy500,
+            ),
           ),
         ),
         const Divider(height: 1),
@@ -37,18 +41,61 @@ class SightingsQueueView extends StatelessWidget {
           child: vm.sightingsSubTabIndex == 0
               ? _PendingView(vm: vm)
               : vm.sightingsSubTabIndex == 1
-                  ? _ReadonlyListView(
+                  ? _ActionableListView(
                       sightings: vm.approvedSightings,
                       isLoading: vm.approvedLoading,
                       emptyText: 'No approved sightings',
+                      primaryIcon: Icons.unarchive,
+                      primaryTooltip: 'Move to pending',
+                      primaryColor: AppTheme.navy500,
+                      onPrimary: (id) => vm.restoreSighting(id),
+                      onDelete: (id) => _confirmDelete(context, id),
                     )
-                  : _ReadonlyListView(
+                  : _ActionableListView(
                       sightings: vm.archivedSightings,
                       isLoading: vm.archivedLoading,
                       emptyText: 'No archived sightings',
+                      primaryIcon: Icons.restore,
+                      primaryTooltip: 'Restore to pending',
+                      primaryColor: AppTheme.success,
+                      onPrimary: (id) => vm.restoreSighting(id),
+                      onDelete: (id) => _confirmDelete(context, id),
                     ),
         ),
       ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String id) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Sighting'),
+        content: const Text(
+          'Are you sure you want to permanently delete this sighting?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(ctx);
+              try {
+                await context.read<AdminViewModel>().deleteSighting(id);
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Delete failed: $e')),
+                );
+              }
+            },
+            child: const Text('Delete',
+                style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -161,15 +208,25 @@ class _PendingView extends StatelessWidget {
   }
 }
 
-class _ReadonlyListView extends StatelessWidget {
+class _ActionableListView extends StatelessWidget {
   final List<Sighting> sightings;
   final bool isLoading;
   final String emptyText;
+  final IconData primaryIcon;
+  final String primaryTooltip;
+  final Color primaryColor;
+  final ValueChanged<String> onPrimary;
+  final ValueChanged<String> onDelete;
 
-  const _ReadonlyListView({
+  const _ActionableListView({
     required this.sightings,
     required this.isLoading,
     required this.emptyText,
+    required this.primaryIcon,
+    required this.primaryTooltip,
+    required this.primaryColor,
+    required this.onPrimary,
+    required this.onDelete,
   });
 
   @override
@@ -188,16 +245,35 @@ class _ReadonlyListView extends StatelessWidget {
       itemCount: sightings.length,
       itemBuilder: (context, index) {
         final sighting = sightings[index];
-        return _ReadonlySightingCard(sighting: sighting);
+        return _ActionableSightingCard(
+          sighting: sighting,
+          primaryIcon: primaryIcon,
+          primaryTooltip: primaryTooltip,
+          primaryColor: primaryColor,
+          onPrimary: () => onPrimary(sighting.id),
+          onDelete: () => onDelete(sighting.id),
+        );
       },
     );
   }
 }
 
-class _ReadonlySightingCard extends StatelessWidget {
+class _ActionableSightingCard extends StatelessWidget {
   final Sighting sighting;
+  final IconData primaryIcon;
+  final String primaryTooltip;
+  final Color primaryColor;
+  final VoidCallback onPrimary;
+  final VoidCallback onDelete;
 
-  const _ReadonlySightingCard({required this.sighting});
+  const _ActionableSightingCard({
+    required this.sighting,
+    required this.primaryIcon,
+    required this.primaryTooltip,
+    required this.primaryColor,
+    required this.onPrimary,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +312,21 @@ class _ReadonlySightingCard extends StatelessWidget {
                 StatusChip(label: sighting.status.name),
               ],
             ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(primaryIcon, color: primaryColor),
+                tooltip: primaryTooltip,
+                onPressed: onPrimary,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: AppTheme.error),
+                tooltip: 'Delete',
+                onPressed: onDelete,
+              ),
+            ],
           ),
         ],
       ),

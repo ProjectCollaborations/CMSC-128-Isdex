@@ -415,6 +415,17 @@ class AdminViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> restoreSighting(String id) async {
+    _isProcessing = true;
+    notifyListeners();
+    try {
+      await _updateSightingStatus(id, SightingStatus.pending);
+    } finally {
+      _isProcessing = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   Future<void> deleteSighting(String id) async {
     _isProcessing = true;
     notifyListeners();
