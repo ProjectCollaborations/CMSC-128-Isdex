@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_theme.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/status_chip.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
 import '../../../models/sighting.dart';
 
@@ -41,7 +44,7 @@ class SightingsQueueView extends StatelessWidget {
                 onPressed: vm.selectedIds.isNotEmpty && !vm.isProcessing
                     ? vm.approveSelected
                     : null,
-                icon: const Icon(Icons.check, color: Colors.green),
+                icon: const Icon(Icons.check, color: AppTheme.success),
                 label: const Text('Approve Selected'),
               ),
               TextButton.icon(
@@ -105,7 +108,7 @@ class SightingsQueueView extends StatelessWidget {
                 }
               });
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
@@ -136,11 +139,10 @@ class _SightingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppCard(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+      padding: const EdgeInsets.all(12),
+      child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(
@@ -163,7 +165,7 @@ class _SightingCard extends StatelessWidget {
                         const Padding(
                           padding: EdgeInsets.only(left: 6),
                           child: Icon(Icons.visibility_off,
-                              size: 14, color: Colors.grey),
+                              size: 14, color: AppTheme.textSecondary),
                         ),
                     ],
                   ),
@@ -177,7 +179,7 @@ class _SightingCard extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 4,
                     children: [
-                      _StatusChip(status: sighting.status.name),
+                      StatusChip(label: sighting.status.name),
                       if (errors.isNotEmpty)
                         Tooltip(
                           message: errors.join('\n'),
@@ -204,7 +206,7 @@ class _SightingCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.check_circle, color: Colors.green),
+                  icon: const Icon(Icons.check_circle, color: AppTheme.success),
                   tooltip: 'Approve',
                   onPressed: isProcessing ? null : onApprove,
                 ),
@@ -214,7 +216,7 @@ class _SightingCard extends StatelessWidget {
                   onPressed: isProcessing ? null : onArchive,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.delete, color: AppTheme.error),
                   tooltip: 'Delete',
                   onPressed: isProcessing ? null : onDelete,
                 ),
@@ -222,7 +224,6 @@ class _SightingCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -231,11 +232,11 @@ class _SightingCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: Colors.grey[600]),
+          Icon(icon, size: 14, color: AppTheme.textSecondary),
           const SizedBox(width: 4),
           Expanded(
             child: Text(text,
-                style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                style: TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
           ),
         ],
       ),
@@ -243,26 +244,4 @@ class _SightingCard extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final String status;
 
-  const _StatusChip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color bg, Color fg) = switch (status) {
-      'pending' => (Colors.orange[100]!, Colors.orange[900]!),
-      'approved' => (Colors.green[100]!, Colors.green[900]!),
-      'rejected' => (Colors.red[100]!, Colors.red[900]!),
-      _ => (Colors.grey[100]!, Colors.grey[900]!),
-    };
-    return Chip(
-      label: Text(status,
-          style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
-      backgroundColor: bg,
-      padding: EdgeInsets.zero,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}

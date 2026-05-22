@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
 import 'fish_form_dialog.dart';
+import '../../../core/constants/app_theme.dart';
 
 class FishManagementView extends StatelessWidget {
   const FishManagementView({super.key});
@@ -123,7 +124,7 @@ class FishManagementView extends StatelessWidget {
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.edit,
-                                      color: Colors.blue),
+                                      color: AppTheme.navy500),
                                   tooltip: 'Edit',
                                   onPressed: () => showDialog(
                                     context: context,
@@ -170,7 +171,7 @@ class FishManagementView extends StatelessWidget {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_forever,
-                                      color: Colors.red),
+                                      color: AppTheme.error),
                                   tooltip: 'Permanently delete',
                                   onPressed: () => _confirmHardDelete(
                                       context, fish.id, isArchived),
@@ -218,14 +219,14 @@ class FishManagementView extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Delete failed: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppTheme.error,
                     ),
                   );
                 }
               });
             },
             child: const Text('Delete Forever',
-                style: TextStyle(color: Colors.red)),
+                style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),

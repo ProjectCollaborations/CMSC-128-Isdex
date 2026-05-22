@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/community_post.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
+import '../../../core/constants/app_theme.dart';
+import '../../../core/widgets/app_card.dart';
 
 Uint8List? _tryDecodeBase64(String data) {
   try {
@@ -67,7 +69,7 @@ class ReportedPostsView extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Post archived.'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppTheme.success,
                     ),
                   );
                 }
@@ -79,7 +81,7 @@ class ReportedPostsView extends StatelessWidget {
                 }
               }
             },
-            child: const Text('Archive', style: TextStyle(color: Colors.red)),
+            child: const Text('Archive', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
@@ -108,7 +110,7 @@ class ReportedPostsView extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Report dismissed.'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppTheme.success,
                     ),
                   );
                 }
@@ -121,7 +123,7 @@ class ReportedPostsView extends StatelessWidget {
               }
             },
             child: const Text('Dismiss',
-                style: TextStyle(color: Colors.green)),
+                style: TextStyle(color: AppTheme.success)),
           ),
         ],
       ),
@@ -144,17 +146,16 @@ class _ReportedPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
+      padding: const EdgeInsets.all(12),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Colors.blue[100],
+                  backgroundColor: AppTheme.teal50,
                   child: Text(
                     post.username.isNotEmpty
                         ? post.username[0].toUpperCase()
@@ -172,16 +173,16 @@ class _ReportedPostCard extends StatelessWidget {
                       Text(
                         _formatTime(post.timePosted),
                         style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600]),
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 Chip(
-                  avatar: const Icon(Icons.flag, size: 14, color: Colors.red),
+                  avatar: const Icon(Icons.flag, size: 14, color: AppTheme.error),
                   label: const Text('Reported',
-                      style: TextStyle(fontSize: 11, color: Colors.red)),
-                  backgroundColor: Colors.red[50],
+                      style: TextStyle(fontSize: 11, color: AppTheme.error)),
+                  backgroundColor: AppTheme.error.withValues(alpha: 0.12),
                   padding: EdgeInsets.zero,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
@@ -202,9 +203,9 @@ class _ReportedPostCard extends StatelessWidget {
               children: [
                 TextButton.icon(
                   onPressed: isProcessing ? null : onDismiss,
-                  icon: const Icon(Icons.check_circle, color: Colors.green),
+                  icon: const Icon(Icons.check_circle, color: AppTheme.success),
                   label: const Text('Dismiss',
-                      style: TextStyle(color: Colors.green)),
+                      style: TextStyle(color: AppTheme.success)),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
@@ -212,7 +213,7 @@ class _ReportedPostCard extends StatelessWidget {
                   icon: const Icon(Icons.delete, color: Colors.white),
                   label: const Text('Archive'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppTheme.error,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -220,7 +221,6 @@ class _ReportedPostCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 

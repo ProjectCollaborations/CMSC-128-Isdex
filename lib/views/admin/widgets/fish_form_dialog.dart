@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_theme.dart';
 import '../../../models/fish.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
 
@@ -243,7 +244,7 @@ class _FishFormDialogState extends State<FishFormDialog> {
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey[800])),
+                        color: AppTheme.textPrimary)),
                 const SizedBox(height: 8),
                 Row(
                   children: [

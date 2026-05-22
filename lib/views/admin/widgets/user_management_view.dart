@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_theme.dart';
+import '../../../core/widgets/status_chip.dart';
 import '../../../viewmodels/admin_viewmodel.dart';
 import '../../../viewmodels/auth_viewmodel.dart';
 
@@ -67,7 +69,7 @@ class UserManagementView extends StatelessWidget {
               ],
             )),
             DataCell(Text(user.email)),
-            DataCell(_RoleChip(role: user.role)),
+            DataCell(StatusChip(label: user.role, color: _roleColor(user.role))),
             DataCell(
               SizedBox(
                 width: 120,
@@ -101,33 +103,10 @@ class UserManagementView extends StatelessWidget {
 
   Color _roleColor(String role) {
     return switch (role) {
-      'admin' => Colors.red,
-      'mod' => Colors.blue,
-      _ => Colors.grey,
+      'admin' => AppTheme.error,
+      'mod' => AppTheme.navy500,
+      _ => AppTheme.textSecondary,
     };
   }
 }
 
-class _RoleChip extends StatelessWidget {
-  final String role;
-
-  const _RoleChip({required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color bg, Color fg) = switch (role) {
-      'admin' => (Colors.red[100]!, Colors.red[900]!),
-      'mod' => (Colors.blue[100]!, Colors.blue[900]!),
-      _ => (Colors.grey[100]!, Colors.grey[900]!),
-    };
-    return Chip(
-      label: Text(role,
-          style: TextStyle(
-              fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
-      backgroundColor: bg,
-      padding: EdgeInsets.zero,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}

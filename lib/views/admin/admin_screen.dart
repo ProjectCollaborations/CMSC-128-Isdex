@@ -7,6 +7,7 @@ import 'widgets/sightings_queue_view.dart';
 import 'widgets/reported_posts_view.dart';
 import 'widgets/fish_management_view.dart';
 import 'widgets/user_management_view.dart';
+import '../../core/constants/app_theme.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -40,7 +41,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Panel'),
+        title: Text(_tabTitle(vm.currentTabIndex)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -53,7 +54,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Logout failed: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppTheme.error,
                     ),
                   );
                 }
@@ -103,5 +104,15 @@ class _AdminScreenState extends State<AdminScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  String _tabTitle(int tab) {
+    return switch (tab) {
+      0 => 'Admin — Sightings',
+      1 => 'Admin — Reports',
+      2 => 'Admin — Fish Data',
+      3 => 'Admin — Users',
+      _ => 'Admin Panel',
+    };
   }
 }
