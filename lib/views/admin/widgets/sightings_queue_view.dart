@@ -13,19 +13,62 @@ class SightingsQueueView extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<AdminViewModel>();
 
-    if (vm.sightingsLoading) {
+    if (vm.pendingLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (vm.sightings.isEmpty) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('Pending')),
+              ButtonSegment(value: 1, label: Text('Approved')),
+              ButtonSegment(value: 2, label: Text('Archived')),
+            ],
+            selected: {vm.sightingsSubTabIndex},
+            onSelectionChanged: (selected) =>
+                vm.setSightingsSubTab(selected.first),
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: vm.sightingsSubTabIndex == 0
+              ? _PendingView(vm: vm)
+              : vm.sightingsSubTabIndex == 1
+                  ? _ReadonlyListView(
+                      sightings: vm.approvedSightings,
+                      isLoading: vm.approvedLoading,
+                      emptyText: 'No approved sightings',
+                    )
+                  : _ReadonlyListView(
+                      sightings: vm.archivedSightings,
+                      isLoading: vm.archivedLoading,
+                      emptyText: 'No archived sightings',
+                    ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PendingView extends StatelessWidget {
+  final AdminViewModel vm;
+
+  const _PendingView({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    final knownFishIds = vm.fishCatalog.map((f) => f.id).toSet();
+    final allSelected = vm.pendingSightings.isNotEmpty &&
+        vm.pendingSightings.every((s) => vm.selectedIds.contains(s.id));
+
+    if (vm.pendingSightings.isEmpty) {
       return const Center(
         child: Text('No pending sightings', style: TextStyle(fontSize: 16)),
       );
     }
-
-    final knownFishIds = vm.fishCatalog.map((f) => f.id).toSet();
-    final allSelected =
-        vm.sightings.every((s) => vm.selectedIds.contains(s.id));
 
     return Column(
       children: [
@@ -60,9 +103,9 @@ class SightingsQueueView extends StatelessWidget {
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
-            itemCount: vm.sightings.length,
+            itemCount: vm.pendingSightings.length,
             itemBuilder: (context, index) {
-              final sighting = vm.sightings[index];
+              final sighting = vm.pendingSightings[index];
               final errors =
                   vm.approvalValidationErrors(sighting, knownFishIds);
               return _SightingCard(
@@ -109,7 +152,106 @@ class SightingsQueueView extends StatelessWidget {
                 );
               }
             },
-            child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
+            child: const Text('Delete',
+                style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadonlyListView extends StatelessWidget {
+  final List<Sighting> sightings;
+  final bool isLoading;
+  final String emptyText;
+
+  const _ReadonlyListView({
+    required this.sightings,
+    required this.isLoading,
+    required this.emptyText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (sightings.isEmpty) {
+      return Center(
+        child: Text(emptyText, style: const TextStyle(fontSize: 16)),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: sightings.length,
+      itemBuilder: (context, index) {
+        final sighting = sightings[index];
+        return _ReadonlySightingCard(sighting: sighting);
+      },
+    );
+  }
+}
+
+class _ReadonlySightingCard extends StatelessWidget {
+  final Sighting sighting;
+
+  const _ReadonlySightingCard({required this.sighting});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      sighting.displayName,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    if (sighting.isAnonymous)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 6),
+                        child: Icon(Icons.visibility_off,
+                            size: 14, color: AppTheme.textSecondary),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                _infoRow(Icons.eco, 'Fish: ${sighting.fishName}'),
+                _infoRow(
+                    Icons.location_on,
+                    '${sighting.latitude.toStringAsFixed(4)}, ${sighting.longitude.toStringAsFixed(4)}'),
+                _infoRow(Icons.calendar_today, sighting.createdAt),
+                const SizedBox(height: 6),
+                StatusChip(label: sighting.status.name),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppTheme.textSecondary),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
           ),
         ],
       ),
@@ -172,7 +314,8 @@ class _SightingCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   _infoRow(Icons.eco, 'Fish: ${sighting.fishName}'),
-                  _infoRow(Icons.location_on,
+                  _infoRow(
+                      Icons.location_on,
                       '${sighting.latitude.toStringAsFixed(4)}, ${sighting.longitude.toStringAsFixed(4)}'),
                   _infoRow(Icons.calendar_today, sighting.createdAt),
                   const SizedBox(height: 6),
@@ -244,5 +387,3 @@ class _SightingCard extends StatelessWidget {
     );
   }
 }
-
-
